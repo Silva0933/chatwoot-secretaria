@@ -161,6 +161,28 @@
       "PICK_BOARD": "Escolha o quadro",
       "OPEN_BOARD": "Abrir no quadro",
       "STEP_CHANGED": "Etapa alterada."
+    },
+    "FILTERS": {
+      "SEARCH_PLACEHOLDER": "Buscar por título ou descrição",
+      "ANY_AGENT": "Todos os agentes",
+      "ANY_INBOX": "Todas as caixas",
+      "ANY_PRIORITY": "Todas as prioridades",
+      "ANY_LABEL": "Todas as etiquetas",
+      "CLEAR_ONE": "Remover este filtro",
+      "CLEAR_ALL": "Limpar filtros",
+      "SHOWING": "mostrando {visible} de {total}",
+      "EMPTY_TITLE": "Nenhum card com esses filtros",
+      "EMPTY_SUBTITLE": "Ajuste ou limpe os filtros para ver os cards do quadro.",
+      "DRAG_DISABLED": "Arraste disponível apenas na ordenação por posição."
+    },
+    "SORT": {
+      "LABEL": "Ordenar por",
+      "POSITION": "Posição",
+      "PRIORITY": "Prioridade",
+      "DUE": "Vencimento",
+      "CREATED": "Mais recentes",
+      "UPDATED": "Última atividade",
+      "TITLE": "Título"
     }
   }
 }

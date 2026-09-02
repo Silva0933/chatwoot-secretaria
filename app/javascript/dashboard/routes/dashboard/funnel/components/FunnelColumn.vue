@@ -12,6 +12,7 @@ const props = defineProps({
   tasks: { type: Array, default: () => [] },
   canEdit: { type: Boolean, default: false },
   canManageSteps: { type: Boolean, default: false },
+  canDrag: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['change', 'addCard', 'openTask', 'configure']);
@@ -90,7 +91,7 @@ const onChange = event => emit('change', { stepId: props.step.id, event });
 
     <Draggable
       :list="tasks"
-      :disabled="!canEdit"
+      :disabled="!canDrag"
       group="funnel-tasks"
       item-key="id"
       tag="div"

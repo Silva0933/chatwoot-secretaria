@@ -6,6 +6,10 @@ import {
   timeInStep,
   dueState,
   DUE_STATES,
+  filterTasks,
+  sortTasks,
+  hasActiveFilters,
+  EMPTY_FILTERS,
 } from '../funnelHelper';
 
 describe('funnelHelper', () => {
@@ -126,6 +130,114 @@ describe('funnelHelper', () => {
 
     it('returns null without a due date', () => {
       expect(dueState(null, now)).toBeNull();
+    });
+  });
+
+  describe('filterTasks', () => {
+    const tasks = [
+      {
+        id: 1,
+        title: 'Retorno da Maria',
+        description: 'trazer exame',
+        priority: 'high',
+        assignees: [{ id: 10 }],
+        labels: [{ id: 100 }],
+        channel: { inboxId: 5 },
+      },
+      {
+        id: 2,
+        title: 'Primeira consulta',
+        priority: 'low',
+        assignees: [{ id: 20 }],
+        labels: [],
+        channel: { inboxId: 6 },
+      },
+      { id: 3, title: 'Sem nada' },
+    ];
+
+    it('returns everything with empty filters', () => {
+      expect(filterTasks(tasks, EMPTY_FILTERS)).toHaveLength(3);
+    });
+
+    it('searches the title and the description', () => {
+      expect(filterTasks(tasks, { search: 'maria' }).map(t => t.id)).toEqual([
+        1,
+      ]);
+      expect(filterTasks(tasks, { search: 'exame' }).map(t => t.id)).toEqual([
+        1,
+      ]);
+    });
+
+    it('ignores a search of only spaces', () => {
+      expect(filterTasks(tasks, { search: '   ' })).toHaveLength(3);
+    });
+
+    it('filters by assignee, inbox, priority and label', () => {
+      expect(filterTasks(tasks, { assigneeId: 20 }).map(t => t.id)).toEqual([
+        2,
+      ]);
+      expect(filterTasks(tasks, { inboxId: 5 }).map(t => t.id)).toEqual([1]);
+      expect(filterTasks(tasks, { priority: 'high' }).map(t => t.id)).toEqual([
+        1,
+      ]);
+      expect(filterTasks(tasks, { labelId: 100 }).map(t => t.id)).toEqual([1]);
+    });
+
+    it('combines filters', () => {
+      expect(filterTasks(tasks, { priority: 'high', assigneeId: 20 })).toEqual(
+        []
+      );
+    });
+
+    // Card sem responsavel, sem canal ou sem etiqueta nao pode passar por um filtro desses.
+    it('drops a card that has none of the filtered attribute', () => {
+      expect(filterTasks(tasks, { assigneeId: 10 }).map(t => t.id)).toEqual([
+        1,
+      ]);
+      expect(filterTasks(tasks, { inboxId: 5 }).map(t => t.id)).not.toContain(
+        3
+      );
+    });
+  });
+
+  describe('hasActiveFilters', () => {
+    it('is false for the empty set and true for anything set', () => {
+      expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
+      expect(hasActiveFilters({ ...EMPTY_FILTERS, priority: 'low' })).toBe(
+        true
+      );
+      expect(hasActiveFilters({ ...EMPTY_FILTERS, search: 'x' })).toBe(true);
+    });
+  });
+
+  describe('sortTasks', () => {
+    const tasks = [
+      { id: 1, rank: '300', priority: 'low', title: 'C', dueAt: '2026-03-20' },
+      { id: 2, rank: '100', priority: 'urgent', title: 'A', dueAt: null },
+      { id: 3, rank: '200', priority: null, title: 'B', dueAt: '2026-03-10' },
+    ];
+
+    it('falls back to the fractional rank', () => {
+      expect(sortTasks(tasks, 'position').map(t => t.id)).toEqual([2, 3, 1]);
+    });
+
+    it('puts the most urgent first and breaks ties by position', () => {
+      expect(sortTasks(tasks, 'priority').map(t => t.id)).toEqual([2, 1, 3]);
+    });
+
+    // Sem prazo nao e "prazo antigo": esses cards vao para o fim, nao para o topo.
+    it('sorts by due date leaving the ones without a date last', () => {
+      expect(sortTasks(tasks, 'due').map(t => t.id)).toEqual([3, 1, 2]);
+    });
+
+    it('sorts by title', () => {
+      expect(sortTasks(tasks, 'title').map(t => t.id)).toEqual([2, 3, 1]);
+    });
+
+    it('does not mutate the given list', () => {
+      const original = tasks.map(t => t.id);
+      sortTasks(tasks, 'title');
+      expect(tasks.map(t => t.id)).toEqual(original);
     });
   });
 

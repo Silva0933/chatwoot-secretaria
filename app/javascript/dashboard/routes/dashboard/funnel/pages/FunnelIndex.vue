@@ -8,6 +8,7 @@ import { useAlert } from 'dashboard/composables';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
+import { EMPTY_FILTERS } from 'dashboard/helper/funnelHelper';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -16,6 +17,7 @@ import Select from 'dashboard/components-next/select/Select.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import BoardCreateDialog from '../components/BoardCreateDialog.vue';
 import FunnelBoardCanvas from '../components/FunnelBoardCanvas.vue';
+import FunnelToolbar from '../components/FunnelToolbar.vue';
 import StepDialog from '../components/StepDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 
@@ -63,6 +65,7 @@ const canManageSettings = computed(
 // O contador do cabecalho soma o quadro inteiro, nao a coluna: e a leitura de volume que a
 // referencia mostra ao lado do nome do funil.
 const totalTasks = computed(() => funnelStore.tasks.length);
+const visibleTaskCount = computed(() => funnelStore.getFilteredTasks.length);
 
 const isLoadingBoard = computed(
   () => uiFlags.value.fetchingBoards || uiFlags.value.fetchingTasks
@@ -88,6 +91,48 @@ const syncBoardInUrl = boardId => {
     params: route.params,
     query: { ...route.query, board: boardId ? String(boardId) : undefined },
   });
+};
+
+// Os filtros vivem na URL para que um quadro filtrado seja um link que se manda para o colega,
+// e para o botao voltar do navegador desfazer um filtro em vez de sair da tela (PRD 4.9).
+const FILTER_QUERY_KEYS = {
+  search: 'q',
+  assigneeId: 'agent',
+  inboxId: 'inbox',
+  priority: 'priority',
+  labelId: 'label',
+};
+
+const readFiltersFromUrl = () => {
+  const filters = {};
+  Object.entries(FILTER_QUERY_KEYS).forEach(([key, param]) => {
+    const raw = route.query[param];
+    if (raw === undefined) return;
+    filters[key] =
+      key === 'search' || key === 'priority' ? String(raw) : Number(raw);
+  });
+
+  funnelStore.setFilters({ ...EMPTY_FILTERS, ...filters });
+  if (route.query.sort) funnelStore.setSortBy(String(route.query.sort));
+};
+
+const writeFiltersToUrl = () => {
+  const query = { ...route.query };
+
+  Object.entries(FILTER_QUERY_KEYS).forEach(([key, param]) => {
+    const value = funnelStore.filters[key];
+    if (value === EMPTY_FILTERS[key]) delete query[param];
+    else query[param] = String(value);
+  });
+
+  if (funnelStore.sortBy === 'position') delete query.sort;
+  else query.sort = funnelStore.sortBy;
+
+  const changed = Object.keys({ ...query, ...route.query }).some(
+    key => String(query[key] ?? '') !== String(route.query[key] ?? '')
+  );
+  if (changed)
+    router.replace({ name: route.name, params: route.params, query });
 };
 
 const selectBoard = async boardId => {
@@ -261,6 +306,8 @@ const loadEverything = () => {
   // abertura de um card mostraria as duas listas vazias.
   store.dispatch('agents/get');
   store.dispatch('labels/get');
+  // O filtro por caixa precisa da lista de inboxes da conta.
+  store.dispatch('inboxes/get');
 };
 
 // Watch e nao onMounted: currentAccount chega de forma assincrona, e num carregamento direto
@@ -268,10 +315,15 @@ const loadEverything = () => {
 // falso, desistiria para sempre, e o quadro apareceria vazio sem nenhuma requisicao ter saido.
 // O mesmo watch cobre a troca de conta, onde a lista precisa ser recarregada mesmo com o
 // modulo ligado nas duas.
+watch(() => [funnelStore.filters, funnelStore.sortBy], writeFiltersToUrl, {
+  deep: true,
+});
+
 watch(
   [isModuleEnabled, () => route.params.accountId],
   ([, accountId], previous) => {
     if (previous && previous[1] !== accountId) funnelStore.reset();
+    if (isModuleEnabled.value) readFiltersFromUrl();
     loadEverything();
   },
   { immediate: true }
@@ -387,12 +439,27 @@ watch(
         />
       </div>
 
+      <FunnelToolbar v-if="activeBoard" />
+
+      <div
+        v-if="activeBoard && funnelStore.hasFilters && !visibleTaskCount"
+        class="flex flex-col items-center justify-center gap-2 px-6 text-center grow"
+      >
+        <h2 class="text-lg font-medium text-n-slate-12">
+          {{ t('FUNNEL.FILTERS.EMPTY_TITLE') }}
+        </h2>
+        <p class="max-w-md text-sm text-n-slate-11">
+          {{ t('FUNNEL.FILTERS.EMPTY_SUBTITLE') }}
+        </p>
+      </div>
+
       <FunnelBoardCanvas
         v-else
         :steps="steps"
         :tasks-by-step="tasksByStep"
         :can-edit="canCreateTask"
         :can-manage-steps="canManageSettings"
+        :can-reorder="funnelStore.canReorder"
         class="grow min-h-0"
         @move="onMoveTask"
         @add-card="openNewTaskDialog"

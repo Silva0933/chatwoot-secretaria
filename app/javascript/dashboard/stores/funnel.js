@@ -6,7 +6,13 @@ import FunnelConversationTasksApi from 'dashboard/api/funnel/conversationTasks';
 import FunnelStepsApi from 'dashboard/api/funnel/steps';
 import FunnelTasksApi from 'dashboard/api/funnel/tasks';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
-import { sortByRank, groupTasksByStep } from 'dashboard/helper/funnelHelper';
+import {
+  sortByRank,
+  groupTasksByStep,
+  filterTasks,
+  hasActiveFilters,
+  EMPTY_FILTERS,
+} from 'dashboard/helper/funnelHelper';
 
 const createUIFlags = () => ({
   fetchingBoards: false,
@@ -40,6 +46,8 @@ export const useFunnelStore = defineStore('funnel', {
     activeBoardId: null,
     taskEvents: [],
     conversationTasks: [],
+    filters: { ...EMPTY_FILTERS },
+    sortBy: 'position',
     uiFlags: createUIFlags(),
   }),
 
@@ -53,11 +61,24 @@ export const useFunnelStore = defineStore('funnel', {
       return sortByRank(this.getActiveBoard?.steps ?? []);
     },
 
+    getFilteredTasks: state => filterTasks(state.tasks, state.filters),
+
     // Um unico agrupamento memoizado alimenta todas as colunas; um getter por coluna
     // reordenaria a lista inteira uma vez por etapa a cada arrasto.
     getTasksByStep() {
-      return groupTasksByStep(this.getSteps, this.tasks);
+      return groupTasksByStep(
+        this.getSteps,
+        this.getFilteredTasks,
+        this.sortBy
+      );
     },
+
+    hasFilters: state => hasActiveFilters(state.filters),
+
+    // Arrastar so faz sentido na ordem por posicao. Nas outras a lista na tela nao reflete o
+    // rank, entao os vizinhos que o arrasto informaria dariam uma posicao sem relacao com o que
+    // o usuario viu — o card pareceria pular de lugar ao voltar para a ordem por posicao.
+    canReorder: state => state.sortBy === 'position',
 
     getUIFlags: state => state.uiFlags,
 
@@ -462,11 +483,25 @@ export const useFunnelStore = defineStore('funnel', {
       }
     },
 
+    setFilters(filters) {
+      this.filters = { ...this.filters, ...filters };
+    },
+
+    clearFilters() {
+      this.filters = { ...EMPTY_FILTERS };
+    },
+
+    setSortBy(sortBy) {
+      this.sortBy = sortBy;
+    },
+
     reset() {
       this.boards = [];
       this.tasks = [];
       this.taskEvents = [];
       this.conversationTasks = [];
+      this.filters = { ...EMPTY_FILTERS };
+      this.sortBy = 'position';
       this.activeBoardId = null;
       this.uiFlags = createUIFlags();
     },

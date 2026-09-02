@@ -161,6 +161,28 @@
       "PICK_BOARD": "Elija el tablero",
       "OPEN_BOARD": "Abrir en el tablero",
       "STEP_CHANGED": "Etapa modificada."
+    },
+    "FILTERS": {
+      "SEARCH_PLACEHOLDER": "Buscar por título o descripción",
+      "ANY_AGENT": "Todos los agentes",
+      "ANY_INBOX": "Todas las bandejas",
+      "ANY_PRIORITY": "Todas las prioridades",
+      "ANY_LABEL": "Todas las etiquetas",
+      "CLEAR_ONE": "Quitar este filtro",
+      "CLEAR_ALL": "Limpiar filtros",
+      "SHOWING": "mostrando {visible} de {total}",
+      "EMPTY_TITLE": "Ninguna tarjeta coincide con estos filtros",
+      "EMPTY_SUBTITLE": "Ajuste o limpie los filtros para ver las tarjetas del tablero.",
+      "DRAG_DISABLED": "Arrastrar solo está disponible al ordenar por posición."
+    },
+    "SORT": {
+      "LABEL": "Ordenar por",
+      "POSITION": "Posición",
+      "PRIORITY": "Prioridad",
+      "DUE": "Vencimiento",
+      "CREATED": "Más recientes",
+      "UPDATED": "Última actividad",
+      "TITLE": "Título"
     }
   }
 }

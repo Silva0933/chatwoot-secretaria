@@ -59,12 +59,125 @@ export const compareRank = (a, b) => {
 export const sortByRank = (items = []) =>
   [...items].sort((a, b) => compareRank(a.rank, b.rank));
 
+export const SORT_OPTIONS = [
+  'position',
+  'priority',
+  'due',
+  'created',
+  'updated',
+  'title',
+];
+
+export const EMPTY_FILTERS = Object.freeze({
+  search: '',
+  assigneeId: null,
+  inboxId: null,
+  priority: null,
+  labelId: null,
+});
+
+export const hasActiveFilters = filters =>
+  Object.entries(EMPTY_FILTERS).some(
+    ([key, empty]) => (filters?.[key] ?? empty) !== empty
+  );
+
+const matchesSearch = (task, term) => {
+  if (!term) return true;
+
+  const needle = term.trim().toLowerCase();
+  if (!needle) return true;
+
+  return [task.title, task.description]
+    .filter(Boolean)
+    .some(field => field.toLowerCase().includes(needle));
+};
+
+/**
+ * Filtro do quadro, aplicado no cliente.
+ *
+ * O quadro ja carrega todos os cards ativos de uma vez, entao filtrar aqui responde na hora e
+ * mantem os contadores das colunas exatos sem uma segunda consulta. O limite dessa escolha e o
+ * tamanho do quadro: passando de alguns milhares de cards ativos, o filtro precisa descer para
+ * o servidor junto com paginacao.
+ */
+export const filterTasks = (tasks = [], filters = EMPTY_FILTERS) =>
+  tasks.filter(task => {
+    if (!matchesSearch(task, filters.search)) return false;
+
+    if (
+      filters.assigneeId &&
+      !(task.assignees ?? []).some(user => user.id === filters.assigneeId)
+    ) {
+      return false;
+    }
+
+    if (filters.inboxId && task.channel?.inboxId !== filters.inboxId) {
+      return false;
+    }
+
+    if (filters.priority && task.priority !== filters.priority) return false;
+
+    if (
+      filters.labelId &&
+      !(task.labels ?? []).some(label => label.id === filters.labelId)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+const PRIORITY_WEIGHT = { urgent: 4, high: 3, medium: 2, low: 1 };
+
+const byDate = (left, right, key) => {
+  // Card sem a data vai para o fim: uma data ausente nao e "muito antiga", e ordenar como se
+  // fosse jogaria os cards sem prazo para o topo de "vence primeiro".
+  const a = left[key] ? new Date(left[key]).getTime() : Infinity;
+  const b = right[key] ? new Date(right[key]).getTime() : Infinity;
+  return a - b;
+};
+
+export const sortTasks = (tasks = [], sortBy = 'position') => {
+  const copy = [...tasks];
+
+  switch (sortBy) {
+    case 'priority':
+      // Sem prioridade vai por ultimo, e o desempate e a posicao, para a ordem nao dancar entre
+      // dois cards igualmente urgentes a cada redesenho.
+      return copy.sort(
+        (left, right) =>
+          (PRIORITY_WEIGHT[right.priority] ?? 0) -
+            (PRIORITY_WEIGHT[left.priority] ?? 0) ||
+          compareRank(left.rank, right.rank)
+      );
+    case 'due':
+      return copy.sort(
+        (left, right) =>
+          byDate(left, right, 'dueAt') || compareRank(left.rank, right.rank)
+      );
+    case 'created':
+      return copy.sort((left, right) => byDate(right, left, 'createdAt'));
+    case 'updated':
+      return copy.sort((left, right) => byDate(right, left, 'updatedAt'));
+    case 'title':
+      return copy.sort((left, right) =>
+        (left.title ?? '').localeCompare(right.title ?? '')
+      );
+    default:
+      return sortByRank(copy);
+  }
+};
+
 /**
  * Distribui os cards nas etapas do quadro, cada lista ja ordenada por rank.
  * Cards cuja etapa nao existe mais na resposta ficam de fora, em vez de sumir numa coluna
  * fantasma.
  */
-export const groupTasksByStep = (steps = [], tasks = []) => {
+export const groupTasksByStep = (
+  steps = [],
+  tasks = [],
+  sortBy = 'position'
+) => {
   const grouped = Object.fromEntries(steps.map(step => [step.id, []]));
 
   tasks.forEach(task => {
@@ -72,7 +185,7 @@ export const groupTasksByStep = (steps = [], tasks = []) => {
   });
 
   Object.keys(grouped).forEach(stepId => {
-    grouped[stepId] = sortByRank(grouped[stepId]);
+    grouped[stepId] = sortTasks(grouped[stepId], sortBy);
   });
 
   return grouped;

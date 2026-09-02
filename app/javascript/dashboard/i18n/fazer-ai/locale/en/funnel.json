@@ -161,6 +161,28 @@
       "PICK_BOARD": "Pick the board",
       "OPEN_BOARD": "Open on the board",
       "STEP_CHANGED": "Stage changed."
+    },
+    "FILTERS": {
+      "SEARCH_PLACEHOLDER": "Search by title or description",
+      "ANY_AGENT": "All agents",
+      "ANY_INBOX": "All inboxes",
+      "ANY_PRIORITY": "All priorities",
+      "ANY_LABEL": "All labels",
+      "CLEAR_ONE": "Remove this filter",
+      "CLEAR_ALL": "Clear filters",
+      "SHOWING": "showing {visible} of {total}",
+      "EMPTY_TITLE": "No card matches these filters",
+      "EMPTY_SUBTITLE": "Adjust or clear the filters to see the cards on the board.",
+      "DRAG_DISABLED": "Dragging is available only when sorting by position."
+    },
+    "SORT": {
+      "LABEL": "Sort by",
+      "POSITION": "Position",
+      "PRIORITY": "Priority",
+      "DUE": "Due date",
+      "CREATED": "Newest",
+      "UPDATED": "Last activity",
+      "TITLE": "Title"
     }
   }
 }

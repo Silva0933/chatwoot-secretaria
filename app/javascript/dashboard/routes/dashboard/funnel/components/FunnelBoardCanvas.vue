@@ -11,6 +11,7 @@ const props = defineProps({
   tasksByStep: { type: Object, default: () => ({}) },
   canEdit: { type: Boolean, default: false },
   canManageSteps: { type: Boolean, default: false },
+  canReorder: { type: Boolean, default: true },
 });
 
 const emit = defineEmits([
@@ -62,6 +63,7 @@ const onColumnChange = ({ stepId, event }) => {
       :step="step"
       :tasks="columns[step.id] ?? []"
       :can-edit="canEdit"
+      :can-drag="canEdit && canReorder"
       :can-manage-steps="canManageSteps"
       @change="onColumnChange"
       @add-card="$emit('addCard', $event)"
