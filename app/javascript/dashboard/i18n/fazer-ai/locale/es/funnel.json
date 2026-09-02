@@ -1,0 +1,99 @@
+{
+  "FUNNEL": {
+    "HEADER": "Embudo",
+    "LOADING": "Cargando el tablero...",
+    "DISABLED": {
+      "TITLE": "El Embudo no está activo en esta cuenta",
+      "SUBTITLE": "Pida al administrador de la instancia que habilite el módulo Embudo para esta cuenta."
+    },
+    "BOARD": {
+      "SWITCH": "Cambiar de tablero",
+      "NEW": "Nuevo tablero",
+      "ARCHIVE": "Archivar tablero",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "¿Archivar {name}?",
+        "DESCRIPTION": "El tablero sale de la lista y sus tarjetas dejan de aparecer. El historial de atención se conserva.",
+        "CONFIRM": "Archivar",
+        "CANCEL": "Cancelar"
+      }
+    },
+    "EMPTY_STATE": {
+      "TITLE": "Aún no hay tableros",
+      "SUBTITLE": "Cree el primer tablero para seguir a sus pacientes por etapa.",
+      "ACTION": "Crear tablero"
+    },
+    "COLUMN": {
+      "ADD_CARD": "Agregar tarjeta",
+      "EMPTY": "No hay tarjetas en esta etapa"
+    },
+    "CARD": {
+      "OVERDUE": "Atrasada",
+      "DUE": "Vence el {date}",
+      "CONVERSATIONS": "{count} conversación | {count} conversaciones",
+      "OPEN": "Abrir tarjeta",
+      "NO_TITLE": "Sin título"
+    },
+    "PRIORITY": {
+      "LABEL": "Prioridad",
+      "NONE": "Sin prioridad",
+      "LOW": "Baja",
+      "MEDIUM": "Media",
+      "HIGH": "Alta",
+      "URGENT": "Urgente"
+    },
+    "STAGE_TYPE": {
+      "OPEN": "En curso",
+      "WON": "Ganado",
+      "LOST": "Perdido"
+    },
+    "TASK": {
+      "CREATE_TITLE": "Nueva tarjeta",
+      "EDIT_TITLE": "Editar tarjeta",
+      "TITLE_LABEL": "Título",
+      "TITLE_PLACEHOLDER": "Ej.: Seguimiento de María",
+      "TITLE_REQUIRED": "Indique un título para la tarjeta",
+      "DESCRIPTION_LABEL": "Descripción",
+      "DESCRIPTION_PLACEHOLDER": "Detalles que el equipo necesita saber",
+      "STEP_LABEL": "Etapa",
+      "DUE_AT_LABEL": "Fecha límite",
+      "CREATE": "Crear tarjeta",
+      "SAVE": "Guardar",
+      "CANCEL": "Cancelar",
+      "ARCHIVE": "Archivar tarjeta",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "¿Archivar esta tarjeta?",
+        "DESCRIPTION": "Sale del tablero, pero permanece en el historial.",
+        "CONFIRM": "Archivar",
+        "CANCEL": "Cancelar"
+      },
+      "ASSIGNEES": "Responsables",
+      "LABELS": "Etiquetas",
+      "CONTACTS": "Contactos"
+    },
+    "BOARD_DIALOG": {
+      "TITLE": "Nuevo tablero",
+      "NAME_LABEL": "Nombre",
+      "NAME_PLACEHOLDER": "Ej.: Recorrido del paciente",
+      "NAME_REQUIRED": "Indique un nombre para el tablero",
+      "DESCRIPTION_LABEL": "Descripción",
+      "DESCRIPTION_PLACEHOLDER": "Para qué sirve este tablero",
+      "TEMPLATE_LABEL": "Etapas iniciales",
+      "TEMPLATE": {
+        "CLINIC": "Clínica (8 etapas)",
+        "BLANK": "Simple (3 etapas)"
+      },
+      "CREATE": "Crear tablero",
+      "CANCEL": "Cancelar"
+    },
+    "API": {
+      "BOARDS_ERROR": "No se pudieron cargar los tableros.",
+      "TASKS_ERROR": "No se pudieron cargar las tarjetas.",
+      "BOARD_CREATED": "Tablero creado.",
+      "BOARD_ARCHIVED": "Tablero archivado.",
+      "TASK_CREATED": "Tarjeta creada.",
+      "TASK_UPDATED": "Tarjeta actualizada.",
+      "TASK_ARCHIVED": "Tarjeta archivada.",
+      "MOVE_ERROR": "No se pudo mover la tarjeta. El tablero se recargó."
+    }
+  }
+}

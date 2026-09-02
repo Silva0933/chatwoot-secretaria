@@ -1,0 +1,99 @@
+{
+  "FUNNEL": {
+    "HEADER": "Funil",
+    "LOADING": "Carregando o quadro...",
+    "DISABLED": {
+      "TITLE": "O Funil não está ativo nesta conta",
+      "SUBTITLE": "Peça ao administrador da instância para habilitar o módulo Funil para esta conta."
+    },
+    "BOARD": {
+      "SWITCH": "Trocar de quadro",
+      "NEW": "Novo quadro",
+      "ARCHIVE": "Arquivar quadro",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Arquivar {name}?",
+        "DESCRIPTION": "O quadro sai da lista e os cards param de aparecer. O histórico de atendimento é preservado.",
+        "CONFIRM": "Arquivar",
+        "CANCEL": "Cancelar"
+      }
+    },
+    "EMPTY_STATE": {
+      "TITLE": "Nenhum quadro por aqui",
+      "SUBTITLE": "Crie o primeiro quadro para acompanhar seus pacientes por etapa.",
+      "ACTION": "Criar quadro"
+    },
+    "COLUMN": {
+      "ADD_CARD": "Adicionar card",
+      "EMPTY": "Nenhum card nesta etapa"
+    },
+    "CARD": {
+      "OVERDUE": "Atrasado",
+      "DUE": "Vence em {date}",
+      "CONVERSATIONS": "{count} conversa | {count} conversas",
+      "OPEN": "Abrir card",
+      "NO_TITLE": "Sem título"
+    },
+    "PRIORITY": {
+      "LABEL": "Prioridade",
+      "NONE": "Sem prioridade",
+      "LOW": "Baixa",
+      "MEDIUM": "Média",
+      "HIGH": "Alta",
+      "URGENT": "Urgente"
+    },
+    "STAGE_TYPE": {
+      "OPEN": "Em andamento",
+      "WON": "Ganho",
+      "LOST": "Perdido"
+    },
+    "TASK": {
+      "CREATE_TITLE": "Novo card",
+      "EDIT_TITLE": "Editar card",
+      "TITLE_LABEL": "Título",
+      "TITLE_PLACEHOLDER": "Ex.: Retorno da Maria",
+      "TITLE_REQUIRED": "Informe um título para o card",
+      "DESCRIPTION_LABEL": "Descrição",
+      "DESCRIPTION_PLACEHOLDER": "Detalhes que a equipe precisa saber",
+      "STEP_LABEL": "Etapa",
+      "DUE_AT_LABEL": "Prazo",
+      "CREATE": "Criar card",
+      "SAVE": "Salvar",
+      "CANCEL": "Cancelar",
+      "ARCHIVE": "Arquivar card",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Arquivar este card?",
+        "DESCRIPTION": "Ele sai do quadro, mas continua no histórico.",
+        "CONFIRM": "Arquivar",
+        "CANCEL": "Cancelar"
+      },
+      "ASSIGNEES": "Responsáveis",
+      "LABELS": "Etiquetas",
+      "CONTACTS": "Contatos"
+    },
+    "BOARD_DIALOG": {
+      "TITLE": "Novo quadro",
+      "NAME_LABEL": "Nome",
+      "NAME_PLACEHOLDER": "Ex.: Jornada do paciente",
+      "NAME_REQUIRED": "Informe um nome para o quadro",
+      "DESCRIPTION_LABEL": "Descrição",
+      "DESCRIPTION_PLACEHOLDER": "Para que serve este quadro",
+      "TEMPLATE_LABEL": "Etapas iniciais",
+      "TEMPLATE": {
+        "CLINIC": "Clínica (8 etapas)",
+        "BLANK": "Simples (3 etapas)"
+      },
+      "CREATE": "Criar quadro",
+      "CANCEL": "Cancelar"
+    },
+    "API": {
+      "BOARDS_ERROR": "Não foi possível carregar os quadros.",
+      "TASKS_ERROR": "Não foi possível carregar os cards.",
+      "BOARD_CREATED": "Quadro criado.",
+      "BOARD_ARCHIVED": "Quadro arquivado.",
+      "TASK_CREATED": "Card criado.",
+      "TASK_UPDATED": "Card atualizado.",
+      "TASK_ARCHIVED": "Card arquivado.",
+      "MOVE_ERROR": "Não foi possível mover o card. O quadro foi recarregado."
+    }
+  }
+}

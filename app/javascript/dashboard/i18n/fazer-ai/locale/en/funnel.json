@@ -1,0 +1,99 @@
+{
+  "FUNNEL": {
+    "HEADER": "Funnel",
+    "LOADING": "Loading the board...",
+    "DISABLED": {
+      "TITLE": "Funnel is not enabled for this account",
+      "SUBTITLE": "Ask the instance administrator to enable the Funnel module for this account."
+    },
+    "BOARD": {
+      "SWITCH": "Switch board",
+      "NEW": "New board",
+      "ARCHIVE": "Archive board",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Archive {name}?",
+        "DESCRIPTION": "The board leaves the list and its cards stop showing up. The support history is preserved.",
+        "CONFIRM": "Archive",
+        "CANCEL": "Cancel"
+      }
+    },
+    "EMPTY_STATE": {
+      "TITLE": "No boards yet",
+      "SUBTITLE": "Create the first board to follow your patients stage by stage.",
+      "ACTION": "Create board"
+    },
+    "COLUMN": {
+      "ADD_CARD": "Add card",
+      "EMPTY": "No cards in this stage"
+    },
+    "CARD": {
+      "OVERDUE": "Overdue",
+      "DUE": "Due {date}",
+      "CONVERSATIONS": "{count} conversation | {count} conversations",
+      "OPEN": "Open card",
+      "NO_TITLE": "Untitled"
+    },
+    "PRIORITY": {
+      "LABEL": "Priority",
+      "NONE": "No priority",
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "STAGE_TYPE": {
+      "OPEN": "In progress",
+      "WON": "Won",
+      "LOST": "Lost"
+    },
+    "TASK": {
+      "CREATE_TITLE": "New card",
+      "EDIT_TITLE": "Edit card",
+      "TITLE_LABEL": "Title",
+      "TITLE_PLACEHOLDER": "e.g. Maria's follow-up",
+      "TITLE_REQUIRED": "Give the card a title",
+      "DESCRIPTION_LABEL": "Description",
+      "DESCRIPTION_PLACEHOLDER": "Details the team needs to know",
+      "STEP_LABEL": "Stage",
+      "DUE_AT_LABEL": "Due date",
+      "CREATE": "Create card",
+      "SAVE": "Save",
+      "CANCEL": "Cancel",
+      "ARCHIVE": "Archive card",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Archive this card?",
+        "DESCRIPTION": "It leaves the board but stays in the history.",
+        "CONFIRM": "Archive",
+        "CANCEL": "Cancel"
+      },
+      "ASSIGNEES": "Assignees",
+      "LABELS": "Labels",
+      "CONTACTS": "Contacts"
+    },
+    "BOARD_DIALOG": {
+      "TITLE": "New board",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g. Patient journey",
+      "NAME_REQUIRED": "Give the board a name",
+      "DESCRIPTION_LABEL": "Description",
+      "DESCRIPTION_PLACEHOLDER": "What this board is for",
+      "TEMPLATE_LABEL": "Starting stages",
+      "TEMPLATE": {
+        "CLINIC": "Clinic (8 stages)",
+        "BLANK": "Simple (3 stages)"
+      },
+      "CREATE": "Create board",
+      "CANCEL": "Cancel"
+    },
+    "API": {
+      "BOARDS_ERROR": "Could not load the boards.",
+      "TASKS_ERROR": "Could not load the cards.",
+      "BOARD_CREATED": "Board created.",
+      "BOARD_ARCHIVED": "Board archived.",
+      "TASK_CREATED": "Card created.",
+      "TASK_UPDATED": "Card updated.",
+      "TASK_ARCHIVED": "Card archived.",
+      "MOVE_ERROR": "Could not move the card. The board was reloaded."
+    }
+  }
+}

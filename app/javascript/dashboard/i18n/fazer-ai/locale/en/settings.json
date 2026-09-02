@@ -51,6 +51,7 @@
   "SIDEBAR": {
     "INTERNAL_CHAT": "Internal Chat",
     "KANBAN": "Kanban",
+    "FUNNEL": "Funnel",
     "APPS": "Apps"
   },
   "KEYBOARD_SHORTCUTS": {

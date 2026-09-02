@@ -4,7 +4,7 @@ class Api::V1::Accounts::Funnel::BoardsController < Api::V1::Accounts::BaseContr
   before_action :check_authorization
 
   def index
-    @boards = policy_scope(Current.account.funnel_boards.active).includes(:steps)
+    @boards = policy_scope(Current.account.funnel_boards.active).includes(:steps, :members)
   end
 
   def show; end
