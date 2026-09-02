@@ -24,6 +24,7 @@ const createUIFlags = () => ({
   movingTask: false,
   updatingAssociations: false,
   savingStep: false,
+  savingBoardSettings: false,
   fetchingConversationTasks: false,
   fetchingEvents: false,
 });
@@ -70,6 +71,20 @@ export const useFunnelStore = defineStore('funnel', {
         this.getSteps,
         this.getFilteredTasks,
         this.sortBy
+      );
+    },
+
+    // Total ponderado: cada card pesa o proprio valor vezes a probabilidade da etapa onde esta.
+    // Respeita o filtro, como o relatorio pede dos contadores.
+    getPipelineValue() {
+      const steps = Object.fromEntries(
+        this.getSteps.map(step => [step.id, (step.probability ?? 0) / 100])
+      );
+
+      return this.getFilteredTasks.reduce(
+        (total, task) =>
+          total + Number(task.value ?? 0) * (steps[task.funnelStepId] ?? 0),
+        0
       );
     },
 
@@ -187,6 +202,7 @@ export const useFunnelStore = defineStore('funnel', {
           name: attributes.name,
           color: attributes.color,
           stage_type: attributes.stageType,
+          probability: attributes.probability,
         };
         const { data } = id
           ? await FunnelStepsApi.update(boardId, id, payload)
@@ -210,6 +226,50 @@ export const useFunnelStore = defineStore('funnel', {
         const { data } = await FunnelStepsApi.delete(boardId, id, targetStepId);
         this.upsertBoard(camelize(data.payload ?? data));
         await this.fetchTasks(boardId);
+        return this.getActiveBoard;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ savingStep: false });
+      }
+    },
+
+    async replaceBoardMembers({ boardId = this.activeBoardId, members }) {
+      this.setUIFlag({ savingBoardSettings: true });
+      try {
+        const { data } = await FunnelBoardsApi.replaceMembers(boardId, members);
+        this.upsertBoard(camelize(data.payload ?? data));
+        return this.getActiveBoard;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ savingBoardSettings: false });
+      }
+    },
+
+    async replaceBoardInboxes({ boardId = this.activeBoardId, inboxIds }) {
+      this.setUIFlag({ savingBoardSettings: true });
+      try {
+        const { data } = await FunnelBoardsApi.replaceInboxes(
+          boardId,
+          inboxIds
+        );
+        this.upsertBoard(camelize(data.payload ?? data));
+        return this.getActiveBoard;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ savingBoardSettings: false });
+      }
+    },
+
+    // A ordem final das etapas, como o arrasto deixou. Poucas colunas, entao reescrever todos os
+    // ranks e barato — ao contrario dos cards, onde o rank fracionario existe para evitar isso.
+    async reorderSteps({ boardId = this.activeBoardId, stepIds }) {
+      this.setUIFlag({ savingStep: true });
+      try {
+        const { data } = await FunnelStepsApi.reorder(boardId, stepIds);
+        this.upsertBoard(camelize(data.payload ?? data));
         return this.getActiveBoard;
       } catch (error) {
         return throwErrorMessage(error);

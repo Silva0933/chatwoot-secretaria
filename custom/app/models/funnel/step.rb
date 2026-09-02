@@ -10,6 +10,7 @@ class Funnel::Step < ApplicationRecord
   validates :name, presence: true, length: { maximum: 255 }
   validates :color, format: { with: /\A#(?:[0-9a-fA-F]{3}){1,2}\z/ }
   validates :rank, presence: true
+  validates :probability, numericality: { only_integer: true, in: 0..100 }
 
   before_validation :assign_default_rank, on: :create
 

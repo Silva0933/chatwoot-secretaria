@@ -423,6 +423,8 @@ Rails.application.routes.draw do
                 resources :steps, only: [:create, :update, :destroy] do
                   patch :reorder, on: :collection
                 end
+                resource :members, only: [:update]
+                resource :inboxes, only: [:update]
                 resources :tasks, only: [:index, :show, :create, :update, :destroy] do
                   patch :move, on: :member
                   # Conjuntos trocados por inteiro, entao resource no singular e so update.

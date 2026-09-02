@@ -32,7 +32,12 @@ const { t } = useI18n();
 
 const dialogRef = ref(null);
 const editingStep = ref(null);
-const form = reactive({ name: '', color: STEP_COLORS[0], stageType: 'open' });
+const form = reactive({
+  name: '',
+  color: STEP_COLORS[0],
+  stageType: 'open',
+  probability: 0,
+});
 
 const isEditing = computed(() => Boolean(editingStep.value));
 const isInvalid = computed(() => !form.name.trim());
@@ -52,6 +57,7 @@ const open = (step = null) => {
   form.name = step?.name ?? '';
   form.color = step?.color ?? STEP_COLORS[0];
   form.stageType = step?.stageType ?? 'open';
+  form.probability = step?.probability ?? 0;
   dialogRef.value?.open();
 };
 
@@ -65,6 +71,7 @@ const handleConfirm = () => {
     name: form.name.trim(),
     color: form.color,
     stageType: form.stageType,
+    probability: Number(form.probability) || 0,
   });
 };
 
@@ -122,6 +129,16 @@ defineExpose({ open, close });
           {{ t('FUNNEL.STEP.TYPE_HINT') }}
         </span>
       </label>
+
+      <Input
+        v-model="form.probability"
+        type="number"
+        min="0"
+        max="100"
+        :label="t('FUNNEL.STEP.PROBABILITY_LABEL')"
+        :message="t('FUNNEL.STEP.PROBABILITY_HINT')"
+        :disabled="isLoading"
+      />
     </div>
 
     <template #footer>

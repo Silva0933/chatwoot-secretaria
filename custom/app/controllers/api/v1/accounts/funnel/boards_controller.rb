@@ -43,6 +43,6 @@ class Api::V1::Accounts::Funnel::BoardsController < Api::V1::Accounts::Funnel::B
   end
 
   def permitted_params
-    params.require(:board).permit(:name, :description)
+    params.require(:board).permit(:name, :description, :currency)
   end
 end

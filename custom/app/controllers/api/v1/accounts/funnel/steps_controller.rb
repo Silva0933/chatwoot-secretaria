@@ -78,6 +78,6 @@ class Api::V1::Accounts::Funnel::StepsController < Api::V1::Accounts::Funnel::Ba
   end
 
   def permitted_params
-    params.require(:step).permit(:name, :description, :color, :stage_type)
+    params.require(:step).permit(:name, :description, :color, :stage_type, :probability)
   end
 end

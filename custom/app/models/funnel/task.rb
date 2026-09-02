@@ -22,6 +22,7 @@ class Funnel::Task < ApplicationRecord
 
   validates :title, presence: true, length: { maximum: 255 }
   validates :rank, presence: true
+  validates :value, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validate :step_belongs_to_board
   validate :board_belongs_to_account
 
@@ -71,7 +72,7 @@ class Funnel::Task < ApplicationRecord
 
   def scalar_event_data
     {
-      id: id, title: title, description: description, priority: priority,
+      id: id, title: title, description: description, priority: priority, value: value&.to_s,
       funnel_board_id: funnel_board_id, funnel_step_id: funnel_step_id, rank: rank.to_s,
       start_at: start_at, due_at: due_at, overdue: overdue?, archived_at: archived_at,
       lock_version: lock_version, custom_attributes: custom_attributes,

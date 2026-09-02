@@ -25,11 +25,11 @@ class CreateFunnelTaskAssociations < ActiveRecord::Migration[7.1]
     end
 
     add_index :funnel_task_conversations, [:funnel_task_id, :conversation_id], unique: true,
-                                                                         name: 'idx_funnel_task_conversations_unique'
+                                                                               name: 'idx_funnel_task_conversations_unique'
     add_index :funnel_task_conversations, [:funnel_board_id, :conversation_id], unique: true, where: 'active',
-                                                                         name: 'idx_funnel_task_conversations_one_active_per_board'
+                                                                                name: 'idx_funnel_task_conversations_one_active_per_board'
     add_index :funnel_task_conversations, :funnel_task_id, unique: true, where: 'is_primary',
-                                                     name: 'idx_funnel_task_conversations_one_primary'
+                                                           name: 'idx_funnel_task_conversations_one_primary'
   end
 
   def create_funnel_task_contacts

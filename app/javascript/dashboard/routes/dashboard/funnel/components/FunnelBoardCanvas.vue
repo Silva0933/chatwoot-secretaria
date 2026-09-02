@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { neighboursAt } from 'dashboard/helper/funnelHelper';
 
+import Draggable from 'vuedraggable';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import FunnelColumn from './FunnelColumn.vue';
 
@@ -29,16 +30,27 @@ const addStepLabel = t('FUNNEL.STEP.NEW');
 // mostrar o card na posicao nova durante o arrasto, e mutar o getter da store faria a coluna
 // pular de volta ao valor calculado antes de a API responder.
 const columns = ref({});
+// Copia local tambem para as etapas: o vuedraggable precisa mutar o array durante o arrasto.
+const localSteps = ref([]);
 
 const syncColumns = () => {
   columns.value = Object.fromEntries(
     props.steps.map(step => [step.id, [...(props.tasksByStep[step.id] ?? [])]])
   );
+  localSteps.value = [...props.steps];
 };
 
 watch(() => [props.steps, props.tasksByStep], syncColumns, {
   immediate: true,
 });
+
+// A ordem final das colunas, como o arrasto deixou. Poucas etapas, entao reescrever todos os
+// ranks e barato; nos cards seria caro, e por isso la o rank e fracionario.
+const onStepDragEnd = () =>
+  emit(
+    'reorderSteps',
+    localSteps.value.map(step => step.id)
+  );
 
 const onColumnChange = ({ stepId, event }) => {
   // `removed` chega na coluna de origem depois de `added` na de destino: tratar os dois
@@ -57,19 +69,31 @@ const onColumnChange = ({ stepId, event }) => {
 
 <template>
   <div class="flex h-full gap-3 px-6 pb-4 overflow-x-auto">
-    <FunnelColumn
-      v-for="step in steps"
-      :key="step.id"
-      :step="step"
-      :tasks="columns[step.id] ?? []"
-      :can-edit="canEdit"
-      :can-drag="canEdit && canReorder"
-      :can-manage-steps="canManageSteps"
-      @change="onColumnChange"
-      @add-card="$emit('addCard', $event)"
-      @open-task="$emit('openTask', $event)"
-      @configure="$emit('configureStep', $event)"
-    />
+    <Draggable
+      v-model="localSteps"
+      :disabled="!canManageSteps"
+      item-key="id"
+      tag="div"
+      class="flex h-full gap-3"
+      handle=".funnel-step-handle"
+      ghost-class="opacity-40"
+      animation="150"
+      @end="onStepDragEnd"
+    >
+      <template #item="{ element }">
+        <FunnelColumn
+          :step="element"
+          :tasks="columns[element.id] ?? []"
+          :can-edit="canEdit"
+          :can-drag="canEdit && canReorder"
+          :can-manage-steps="canManageSteps"
+          @change="onColumnChange"
+          @add-card="$emit('addCard', $event)"
+          @open-task="$emit('openTask', $event)"
+          @configure="$emit('configureStep', $event)"
+        />
+      </template>
+    </Draggable>
 
     <button
       v-if="canManageSteps"

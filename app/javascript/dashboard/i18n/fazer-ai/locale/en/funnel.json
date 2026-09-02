@@ -72,7 +72,13 @@
       },
       "ASSIGNEES": "Assignees",
       "LABELS": "Labels",
-      "CONTACTS": "Contacts"
+      "CONTACTS": "Contacts",
+      "VALUE_LABEL": "Value",
+      "ATTRIBUTES": "Custom attributes",
+      "ATTRIBUTE_KEY": "Key",
+      "ATTRIBUTE_VALUE": "Value",
+      "ATTRIBUTE_ADD": "Add attribute",
+      "ATTRIBUTE_REMOVE": "Remove attribute"
     },
     "BOARD_DIALOG": {
       "TITLE": "New board",
@@ -152,7 +158,9 @@
       "DELETE_LAST": "A board needs at least one stage.",
       "SAVED": "Stage saved.",
       "CREATED": "Stage created.",
-      "DELETED": "Stage deleted."
+      "DELETED": "Stage deleted.",
+      "PROBABILITY_LABEL": "Probability to close (%)",
+      "PROBABILITY_HINT": "Used for the weighted pipeline value."
     },
     "CONVERSATION": {
       "SIDEBAR_TITLE": "Funnel",
@@ -183,6 +191,35 @@
       "CREATED": "Newest",
       "UPDATED": "Last activity",
       "TITLE": "Title"
+    },
+    "SETTINGS": {
+      "TITLE": "Board settings",
+      "SAVE": "Save",
+      "CANCEL": "Cancel",
+      "SAVED": "Settings saved.",
+      "CURRENCY_LABEL": "Currency",
+      "CURRENCY_HINT": "3-letter ISO code, e.g. BRL",
+      "MEMBERS": "Members",
+      "MEMBERS_HINT": "Only these people see the board. Account administrators always do.",
+      "MEMBERS_PLACEHOLDER": "Pick the agents",
+      "ROLE_LABEL": "Role",
+      "SCOPE_LABEL": "Visibility",
+      "ROLES": {
+        "MANAGER": "Manager",
+        "MEMBER": "Member",
+        "VIEWER": "Read only"
+      },
+      "SCOPES": {
+        "ALL_TASKS": "All cards",
+        "OWN_TASKS": "Only their own"
+      },
+      "INBOXES": "Inboxes",
+      "INBOXES_HINT": "Which channels feed this funnel.",
+      "INBOXES_PLACEHOLDER": "Pick the inboxes",
+      "NO_INBOXES": "No inbox found",
+      "CONFIGURE": "Configure board",
+      "PIPELINE_VALUE": "weighted value",
+      "REORDER_HINT": "Drag the header to reorder the stages."
     }
   }
 }

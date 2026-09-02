@@ -72,7 +72,13 @@
       },
       "ASSIGNEES": "Responsáveis",
       "LABELS": "Etiquetas",
-      "CONTACTS": "Contatos"
+      "CONTACTS": "Contatos",
+      "VALUE_LABEL": "Valor",
+      "ATTRIBUTES": "Atributos personalizados",
+      "ATTRIBUTE_KEY": "Chave",
+      "ATTRIBUTE_VALUE": "Valor",
+      "ATTRIBUTE_ADD": "Adicionar atributo",
+      "ATTRIBUTE_REMOVE": "Remover atributo"
     },
     "BOARD_DIALOG": {
       "TITLE": "Novo quadro",
@@ -152,7 +158,9 @@
       "DELETE_LAST": "Um quadro precisa de ao menos uma etapa.",
       "SAVED": "Etapa salva.",
       "CREATED": "Etapa criada.",
-      "DELETED": "Etapa excluída."
+      "DELETED": "Etapa excluída.",
+      "PROBABILITY_LABEL": "Probabilidade de fechar (%)",
+      "PROBABILITY_HINT": "Usada no valor ponderado do funil."
     },
     "CONVERSATION": {
       "SIDEBAR_TITLE": "Funil",
@@ -183,6 +191,35 @@
       "CREATED": "Mais recentes",
       "UPDATED": "Última atividade",
       "TITLE": "Título"
+    },
+    "SETTINGS": {
+      "TITLE": "Configurações do quadro",
+      "SAVE": "Salvar",
+      "CANCEL": "Cancelar",
+      "SAVED": "Configurações salvas.",
+      "CURRENCY_LABEL": "Moeda",
+      "CURRENCY_HINT": "Código ISO de 3 letras, ex.: BRL",
+      "MEMBERS": "Membros",
+      "MEMBERS_HINT": "Só quem está aqui enxerga o quadro. Administradores da conta veem sempre.",
+      "MEMBERS_PLACEHOLDER": "Escolha os agentes",
+      "ROLE_LABEL": "Papel",
+      "SCOPE_LABEL": "Visibilidade",
+      "ROLES": {
+        "MANAGER": "Gestor",
+        "MEMBER": "Membro",
+        "VIEWER": "Somente leitura"
+      },
+      "SCOPES": {
+        "ALL_TASKS": "Todos os cards",
+        "OWN_TASKS": "Só os próprios"
+      },
+      "INBOXES": "Caixas de entrada",
+      "INBOXES_HINT": "Quais canais alimentam este funil.",
+      "INBOXES_PLACEHOLDER": "Escolha as caixas",
+      "NO_INBOXES": "Nenhuma caixa encontrada",
+      "CONFIGURE": "Configurar quadro",
+      "PIPELINE_VALUE": "valor ponderado",
+      "REORDER_HINT": "Arraste o cabeçalho para reordenar as etapas."
     }
   }
 }

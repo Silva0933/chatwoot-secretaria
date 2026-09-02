@@ -2,6 +2,8 @@ json.id task.id
 json.title task.title
 json.description task.description
 json.priority task.priority
+# String e nao numero: decimal(15,2) em JSON viraria float, e centavo somado em float erra.
+json.value task.value&.to_s
 json.funnel_board_id task.funnel_board_id
 json.funnel_step_id task.funnel_step_id
 # Nome do quadro e da etapa junto do card: no painel da conversa nao ha colunas em volta para

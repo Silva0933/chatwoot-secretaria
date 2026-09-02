@@ -64,7 +64,7 @@ class Api::V1::Accounts::Funnel::TasksController < Api::V1::Accounts::Funnel::Ba
 
   def permitted_params
     params.require(:task).permit(
-      :title, :description, :priority, :funnel_step_id, :start_at, :due_at, :lock_version,
+      :title, :description, :priority, :funnel_step_id, :start_at, :due_at, :lock_version, :value,
       custom_attributes: {}
     )
   end

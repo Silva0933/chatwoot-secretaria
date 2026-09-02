@@ -8,7 +8,7 @@ import { useAlert } from 'dashboard/composables';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
-import { EMPTY_FILTERS } from 'dashboard/helper/funnelHelper';
+import { EMPTY_FILTERS, formatMoney } from 'dashboard/helper/funnelHelper';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -16,12 +16,13 @@ import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.v
 import Select from 'dashboard/components-next/select/Select.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import BoardCreateDialog from '../components/BoardCreateDialog.vue';
+import BoardSettingsDialog from '../components/BoardSettingsDialog.vue';
 import FunnelBoardCanvas from '../components/FunnelBoardCanvas.vue';
 import FunnelToolbar from '../components/FunnelToolbar.vue';
 import StepDialog from '../components/StepDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const funnelStore = useFunnelStore();
@@ -33,6 +34,7 @@ const currentRole = useMapGetter('getCurrentRole');
 const boardCreateDialogRef = ref(null);
 const taskDialogRef = ref(null);
 const stepDialogRef = ref(null);
+const boardSettingsRef = ref(null);
 const stepPendingDelete = ref(null);
 const deleteStepDialogRef = ref(null);
 const deleteTargetStepId = ref(null);
@@ -66,6 +68,18 @@ const canManageSettings = computed(
 // referencia mostra ao lado do nome do funil.
 const totalTasks = computed(() => funnelStore.tasks.length);
 const visibleTaskCount = computed(() => funnelStore.getFilteredTasks.length);
+
+// O total ponderado so aparece quando ha valor lancado: um "R$ 0" permanente num funil de
+// clinica, onde ninguem preenche valor, seria ruido fixo no cabecalho.
+const pipelineValue = computed(() => funnelStore.getPipelineValue);
+const showPipelineValue = computed(() => pipelineValue.value > 0);
+const pipelineValueLabel = computed(() =>
+  formatMoney(
+    pipelineValue.value,
+    activeBoard.value?.currency ?? 'BRL',
+    locale.value.replace('_', '-')
+  )
+);
 
 const isLoadingBoard = computed(
   () => uiFlags.value.fetchingBoards || uiFlags.value.fetchingTasks
@@ -182,6 +196,14 @@ const onCreateBoard = async payload => {
   }
 };
 
+const onSaveBoard = async payload => {
+  try {
+    await funnelStore.updateBoard(payload);
+  } catch (error) {
+    useAlert(error.message);
+  }
+};
+
 const onArchiveBoard = async () => {
   const boardId = activeBoard.value?.id;
   if (!boardId) return;
@@ -255,6 +277,14 @@ const deleteTargetOptions = computed(() =>
     .filter(step => step.id !== stepPendingDelete.value?.id)
     .map(step => ({ value: step.id, label: step.name }))
 );
+
+const onReorderSteps = async stepIds => {
+  try {
+    await funnelStore.reorderSteps({ stepIds });
+  } catch (error) {
+    useAlert(error.message);
+  }
+};
 
 const onSubmitStep = async payload => {
   try {
@@ -390,6 +420,22 @@ watch(
             :label="t('FUNNEL.BOARD.NEW')"
             @click="boardCreateDialogRef?.open()"
           />
+          <span
+            v-if="showPipelineValue"
+            class="px-2 py-1 text-xs font-medium rounded-md bg-n-alpha-2 text-n-slate-11"
+            :title="t('FUNNEL.SETTINGS.PIPELINE_VALUE')"
+          >
+            {{ pipelineValueLabel }}
+          </span>
+          <Button
+            v-if="activeBoard && canManageSettings"
+            variant="ghost"
+            color="slate"
+            size="sm"
+            icon="i-lucide-settings"
+            :aria-label="t('FUNNEL.SETTINGS.CONFIGURE')"
+            @click="boardSettingsRef?.open()"
+          />
           <Button
             v-if="activeBoard && canManageBoard"
             variant="ghost"
@@ -465,6 +511,7 @@ watch(
         @add-card="openNewTaskDialog"
         @open-task="openTaskDialog"
         @configure-step="stepDialogRef?.open($event)"
+        @reorder-steps="onReorderSteps"
         @add-step="stepDialogRef?.open()"
       />
     </template>
@@ -483,6 +530,12 @@ watch(
       :can-edit="canCreateTask"
       @submit="onSubmitTask"
       @archive="onRequestArchiveTask"
+    />
+
+    <BoardSettingsDialog
+      ref="boardSettingsRef"
+      :board="activeBoard"
+      @save-board="onSaveBoard"
     />
 
     <StepDialog

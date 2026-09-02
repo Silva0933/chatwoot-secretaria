@@ -54,7 +54,10 @@ const onChange = event => emit('change', { stepId: props.step.id, event });
   >
     <header
       class="flex items-center gap-2 px-3 py-2.5 rounded-t-xl"
-      :class="headerTextClass"
+      :class="[
+        headerTextClass,
+        canManageSteps ? 'funnel-step-handle cursor-grab' : '',
+      ]"
       :style="{ backgroundColor: step.color }"
       :title="stageLabel"
     >

@@ -72,7 +72,13 @@
       },
       "ASSIGNEES": "Responsables",
       "LABELS": "Etiquetas",
-      "CONTACTS": "Contactos"
+      "CONTACTS": "Contactos",
+      "VALUE_LABEL": "Valor",
+      "ATTRIBUTES": "Atributos personalizados",
+      "ATTRIBUTE_KEY": "Clave",
+      "ATTRIBUTE_VALUE": "Valor",
+      "ATTRIBUTE_ADD": "Agregar atributo",
+      "ATTRIBUTE_REMOVE": "Quitar atributo"
     },
     "BOARD_DIALOG": {
       "TITLE": "Nuevo tablero",
@@ -152,7 +158,9 @@
       "DELETE_LAST": "Un tablero necesita al menos una etapa.",
       "SAVED": "Etapa guardada.",
       "CREATED": "Etapa creada.",
-      "DELETED": "Etapa eliminada."
+      "DELETED": "Etapa eliminada.",
+      "PROBABILITY_LABEL": "Probabilidad de cierre (%)",
+      "PROBABILITY_HINT": "Se usa en el valor ponderado del embudo."
     },
     "CONVERSATION": {
       "SIDEBAR_TITLE": "Embudo",
@@ -183,6 +191,35 @@
       "CREATED": "Más recientes",
       "UPDATED": "Última actividad",
       "TITLE": "Título"
+    },
+    "SETTINGS": {
+      "TITLE": "Configuración del tablero",
+      "SAVE": "Guardar",
+      "CANCEL": "Cancelar",
+      "SAVED": "Configuración guardada.",
+      "CURRENCY_LABEL": "Moneda",
+      "CURRENCY_HINT": "Código ISO de 3 letras, ej.: BRL",
+      "MEMBERS": "Miembros",
+      "MEMBERS_HINT": "Solo estas personas ven el tablero. Los administradores siempre lo ven.",
+      "MEMBERS_PLACEHOLDER": "Elija los agentes",
+      "ROLE_LABEL": "Rol",
+      "SCOPE_LABEL": "Visibilidad",
+      "ROLES": {
+        "MANAGER": "Gestor",
+        "MEMBER": "Miembro",
+        "VIEWER": "Solo lectura"
+      },
+      "SCOPES": {
+        "ALL_TASKS": "Todas las tarjetas",
+        "OWN_TASKS": "Solo las propias"
+      },
+      "INBOXES": "Bandejas de entrada",
+      "INBOXES_HINT": "Qué canales alimentan este embudo.",
+      "INBOXES_PLACEHOLDER": "Elija las bandejas",
+      "NO_INBOXES": "No se encontró ninguna bandeja",
+      "CONFIGURE": "Configurar tablero",
+      "PIPELINE_VALUE": "valor ponderado",
+      "REORDER_HINT": "Arrastre el encabezado para reordenar las etapas."
     }
   }
 }

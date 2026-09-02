@@ -8,6 +8,7 @@ class Funnel::Board < ApplicationRecord
   has_many :tasks, class_name: 'Funnel::Task', foreign_key: :funnel_board_id, dependent: :destroy, inverse_of: :board
 
   validates :name, presence: true, length: { maximum: 255 }
+  validates :currency, format: { with: /\A[A-Z]{3}\z/ }
 
   scope :active, -> { where(archived_at: nil) }
 
@@ -20,10 +21,11 @@ class Funnel::Board < ApplicationRecord
       id: id,
       name: name,
       description: description,
+      currency: currency,
       archived_at: archived_at,
       steps: steps.ordered.map do |step|
         { id: step.id, name: step.name, description: step.description, color: step.color,
-          rank: step.rank.to_s, stage_type: step.stage_type }
+          rank: step.rank.to_s, stage_type: step.stage_type, probability: step.probability }
       end
     }
   end

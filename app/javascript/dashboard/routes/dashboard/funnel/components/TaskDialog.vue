@@ -33,7 +33,12 @@ const form = reactive({
   funnelStepId: '',
   priority: '',
   dueAt: '',
+  value: '',
 });
+
+// Atributos personalizados viram lista de pares para poder editar: um objeto nao tem ordem, e
+// renomear uma chave num objeto reativo significaria apagar e recriar a entrada a cada tecla.
+const attributePairs = ref([]);
 
 const isEditing = computed(() => Boolean(editingTask.value));
 
@@ -82,6 +87,8 @@ const resetForm = () => {
   form.funnelStepId = props.steps[0]?.id ?? '';
   form.priority = '';
   form.dueAt = '';
+  form.value = '';
+  attributePairs.value = [];
 };
 
 const open = ({ task = null, step = null } = {}) => {
@@ -94,6 +101,10 @@ const open = ({ task = null, step = null } = {}) => {
     form.funnelStepId = task.funnelStepId ?? props.steps[0]?.id ?? '';
     form.priority = task.priority ?? '';
     form.dueAt = toLocalInput(task.dueAt);
+    form.value = task.value ?? '';
+    attributePairs.value = Object.entries(task.customAttributes ?? {}).map(
+      ([key, value]) => ({ key, value: String(value ?? '') })
+    );
   } else if (step) {
     form.funnelStepId = step.id;
   }
@@ -116,6 +127,14 @@ const handleConfirm = () => {
     funnelStepId: form.funnelStepId || null,
     priority: form.priority || null,
     dueAt: fromLocalInput(form.dueAt),
+    value: form.value === '' ? null : Number(form.value),
+    // Par sem chave e linha que o usuario comecou e nao terminou; mandar "" como chave criaria
+    // um atributo invisivel no card.
+    customAttributes: Object.fromEntries(
+      attributePairs.value
+        .filter(pair => pair.key.trim())
+        .map(pair => [pair.key.trim(), pair.value])
+    ),
   });
 };
 
@@ -188,6 +207,50 @@ defineExpose({ open, close });
           :disabled="isLoading"
         />
       </div>
+
+      <section class="flex flex-col gap-2">
+        <span class="text-sm font-medium text-n-slate-12">
+          {{ t('FUNNEL.TASK.ATTRIBUTES') }}
+        </span>
+        <div
+          v-for="(pair, index) in attributePairs"
+          :key="index"
+          class="flex items-end gap-2"
+        >
+          <Input
+            v-model="pair.key"
+            class="flex-1"
+            :placeholder="t('FUNNEL.TASK.ATTRIBUTE_KEY')"
+            :disabled="isLoading"
+          />
+          <Input
+            v-model="pair.value"
+            class="flex-1"
+            :placeholder="t('FUNNEL.TASK.ATTRIBUTE_VALUE')"
+            :disabled="isLoading"
+          />
+          <Button
+            variant="ghost"
+            color="ruby"
+            size="sm"
+            icon="i-lucide-x"
+            type="button"
+            :aria-label="t('FUNNEL.TASK.ATTRIBUTE_REMOVE')"
+            :disabled="isLoading"
+            @click="attributePairs.splice(index, 1)"
+          />
+        </div>
+        <Button
+          variant="link"
+          color="slate"
+          size="xs"
+          icon="i-lucide-plus"
+          type="button"
+          :label="t('FUNNEL.TASK.ATTRIBUTE_ADD')"
+          :disabled="isLoading"
+          @click="attributePairs.push({ key: '', value: '' })"
+        />
+      </section>
 
       <!-- Associacoes so existem para card ja gravado: sem id nao ha onde pendurar responsavel
            nem conversa. No card novo a coluna explica isso em vez de ficar vazia. -->

@@ -273,3 +273,26 @@ export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 export const STAGE_TYPES = ['open', 'won', 'lost'];
 
 export const BOARD_TEMPLATES = ['clinic', 'blank'];
+
+export const BOARD_MEMBER_ROLES = ['manager', 'member', 'viewer'];
+
+export const VISIBILITY_SCOPES = ['all_tasks', 'own_tasks'];
+
+/**
+ * Valor formatado na moeda do quadro. Cai para o codigo cru quando a moeda nao e reconhecida
+ * pelo navegador: mostrar "XYZ 1.500" informa mais do que estourar ou esconder o numero.
+ */
+export const formatMoney = (value, currency = 'BRL', locale = 'pt-BR') => {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount)) return '';
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${currency} ${Math.round(amount).toLocaleString(locale)}`;
+  }
+};

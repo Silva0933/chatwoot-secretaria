@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
+ActiveRecord::Schema[7.1].define(version: 2026_09_02_200000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1160,6 +1160,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
     t.jsonb "settings", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "currency", limit: 3, default: "BRL", null: false
     t.index ["account_id", "archived_at"], name: "index_funnel_boards_on_account_id_and_archived_at"
     t.index ["account_id"], name: "index_funnel_boards_on_account_id"
   end
@@ -1173,6 +1174,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
     t.integer "stage_type", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "probability", default: 0, null: false
     t.index ["funnel_board_id", "rank"], name: "index_funnel_steps_on_funnel_board_id_and_rank"
     t.index ["funnel_board_id"], name: "index_funnel_steps_on_funnel_board_id"
   end
@@ -1257,6 +1259,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "step_changed_at", null: false
+    t.decimal "value", precision: 15, scale: 2
     t.index ["account_id", "archived_at"], name: "idx_funnel_tasks_on_account_archived_at"
     t.index ["account_id"], name: "index_funnel_tasks_on_account_id"
     t.index ["created_by_id"], name: "index_funnel_tasks_on_created_by_id"
@@ -1264,6 +1267,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
     t.index ["funnel_board_id", "due_at"], name: "idx_funnel_tasks_on_board_due_at"
     t.index ["funnel_board_id", "funnel_step_id", "rank"], name: "idx_funnel_tasks_on_board_step_rank"
     t.index ["funnel_board_id", "priority"], name: "idx_funnel_tasks_on_board_priority"
+    t.index ["funnel_board_id", "value"], name: "idx_funnel_tasks_on_board_value"
     t.index ["funnel_board_id"], name: "index_funnel_tasks_on_funnel_board_id"
     t.index ["funnel_step_id", "step_changed_at"], name: "idx_funnel_tasks_on_step_changed_at"
     t.index ["funnel_step_id"], name: "index_funnel_tasks_on_funnel_step_id"
