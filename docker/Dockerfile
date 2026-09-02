@@ -76,6 +76,16 @@ RUN pnpm i
 
 COPY . /app
 
+# A Chatwoot Enterprise License permite copiar e modificar o codigo para desenvolvimento e
+# teste, mas so autoriza uso em producao com assinatura Enterprise valida. Este fork e
+# revendido, entao enterprise/ fica no repositorio, onde a licenca permite, e nao entra na
+# imagem. Mesma receita do publish_foss_docker.yml do upstream.
+#
+# ChatwootApp.enterprise? passa a ser false por ausencia da pasta, e o proprio core desliga os
+# recursos correspondentes. Sai junto: Captain, Companies, Calls, SLA, audit logs, custom roles,
+# capacidade de agente, SAML e analytics de campanha.
+RUN rm -rf enterprise spec/enterprise
+
 # creating a log directory so that image wont fail when RAILS_LOG_TO_STDOUT is false
 # https://github.com/chatwoot/chatwoot/issues/701
 RUN mkdir -p /app/log

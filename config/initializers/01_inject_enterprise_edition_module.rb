@@ -79,8 +79,14 @@ module InjectEnterpriseEditionModule
     end
   end
 
+  # A guarda testa Module e nao nil: esta funcao devolve false quando a constante nao existe, e
+  # each_extension_for realimenta esse retorno como mod na chamada seguinte. Com `mod&.` um
+  # namespace ausente chegava aqui como false e estourava NoMethodError no boot, porque o &. so
+  # protege contra nil. Só um Module guarda constantes, entao e isso que se pergunta.
   def const_get_maybe_false(mod, name)
-    mod&.const_defined?(name, false) && mod&.const_get(name, false)
+    return false unless mod.is_a?(Module)
+
+    mod.const_defined?(name, false) && mod.const_get(name, false)
   end
 end
 
