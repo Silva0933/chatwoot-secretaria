@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_31_010000) do
+ActiveRecord::Schema[7.1].define(version: 2026_09_01_120400) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1130,6 +1130,143 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_31_010000) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "funnel_board_inboxes", force: :cascade do |t|
+    t.bigint "funnel_board_id", null: false
+    t.bigint "inbox_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["funnel_board_id", "inbox_id"], name: "idx_funnel_board_inboxes_unique", unique: true
+    t.index ["funnel_board_id"], name: "index_funnel_board_inboxes_on_funnel_board_id"
+    t.index ["inbox_id"], name: "index_funnel_board_inboxes_on_inbox_id"
+  end
+
+  create_table "funnel_board_members", force: :cascade do |t|
+    t.bigint "funnel_board_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "role", default: 0, null: false
+    t.integer "visibility_scope", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["funnel_board_id", "user_id"], name: "idx_funnel_board_members_unique", unique: true
+    t.index ["funnel_board_id"], name: "index_funnel_board_members_on_funnel_board_id"
+    t.index ["user_id"], name: "index_funnel_board_members_on_user_id"
+  end
+
+  create_table "funnel_boards", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.datetime "archived_at"
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "archived_at"], name: "index_funnel_boards_on_account_id_and_archived_at"
+    t.index ["account_id"], name: "index_funnel_boards_on_account_id"
+  end
+
+  create_table "funnel_steps", force: :cascade do |t|
+    t.bigint "funnel_board_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.string "color", default: "#1f93ff", null: false
+    t.decimal "rank", precision: 30, scale: 15, null: false
+    t.integer "stage_type", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["funnel_board_id", "rank"], name: "index_funnel_steps_on_funnel_board_id_and_rank"
+    t.index ["funnel_board_id"], name: "index_funnel_steps_on_funnel_board_id"
+  end
+
+  create_table "funnel_task_assignees", force: :cascade do |t|
+    t.bigint "funnel_task_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["funnel_task_id", "user_id"], name: "idx_funnel_task_assignees_unique", unique: true
+    t.index ["funnel_task_id"], name: "index_funnel_task_assignees_on_funnel_task_id"
+    t.index ["user_id"], name: "index_funnel_task_assignees_on_user_id"
+  end
+
+  create_table "funnel_task_contacts", force: :cascade do |t|
+    t.bigint "funnel_task_id", null: false
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_id"], name: "index_funnel_task_contacts_on_contact_id"
+    t.index ["funnel_task_id", "contact_id"], name: "idx_funnel_task_contacts_unique", unique: true
+    t.index ["funnel_task_id"], name: "index_funnel_task_contacts_on_funnel_task_id"
+  end
+
+  create_table "funnel_task_conversations", force: :cascade do |t|
+    t.bigint "funnel_task_id", null: false
+    t.bigint "conversation_id", null: false
+    t.bigint "funnel_board_id", null: false
+    t.boolean "is_primary", default: false, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conversation_id"], name: "index_funnel_task_conversations_on_conversation_id"
+    t.index ["funnel_board_id", "conversation_id"], name: "idx_funnel_task_conversations_one_active_per_board", unique: true, where: "active"
+    t.index ["funnel_task_id", "conversation_id"], name: "idx_funnel_task_conversations_unique", unique: true
+    t.index ["funnel_task_id"], name: "idx_funnel_task_conversations_one_primary", unique: true, where: "is_primary"
+    t.index ["funnel_task_id"], name: "index_funnel_task_conversations_on_funnel_task_id"
+  end
+
+  create_table "funnel_task_events", force: :cascade do |t|
+    t.bigint "funnel_task_id", null: false
+    t.bigint "account_id", null: false
+    t.bigint "actor_id"
+    t.string "actor_type"
+    t.string "event_type", null: false
+    t.string "source", default: "web", null: false
+    t.uuid "correlation_id"
+    t.jsonb "data_before", default: {}, null: false
+    t.jsonb "data_after", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.index ["account_id"], name: "index_funnel_task_events_on_account_id"
+    t.index ["actor_type", "actor_id"], name: "index_funnel_task_events_on_actor_type_and_actor_id"
+    t.index ["correlation_id"], name: "index_funnel_task_events_on_correlation_id", where: "(correlation_id IS NOT NULL)"
+    t.index ["funnel_task_id", "created_at"], name: "index_funnel_task_events_on_funnel_task_id_and_created_at"
+    t.index ["funnel_task_id"], name: "index_funnel_task_events_on_funnel_task_id"
+  end
+
+  create_table "funnel_task_labels", force: :cascade do |t|
+    t.bigint "funnel_task_id", null: false
+    t.bigint "label_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["funnel_task_id", "label_id"], name: "idx_funnel_task_labels_unique", unique: true
+    t.index ["funnel_task_id"], name: "index_funnel_task_labels_on_funnel_task_id"
+    t.index ["label_id"], name: "index_funnel_task_labels_on_label_id"
+  end
+
+  create_table "funnel_tasks", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "funnel_board_id", null: false
+    t.bigint "funnel_step_id", null: false
+    t.bigint "created_by_id"
+    t.string "title", null: false
+    t.text "description"
+    t.integer "priority"
+    t.decimal "rank", precision: 30, scale: 15, null: false
+    t.datetime "start_at"
+    t.datetime "due_at"
+    t.datetime "archived_at"
+    t.jsonb "custom_attributes", default: {}, null: false
+    t.integer "lock_version", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "archived_at"], name: "idx_funnel_tasks_on_account_archived_at"
+    t.index ["account_id"], name: "index_funnel_tasks_on_account_id"
+    t.index ["created_by_id"], name: "index_funnel_tasks_on_created_by_id"
+    t.index ["custom_attributes"], name: "index_funnel_tasks_on_custom_attributes", using: :gin
+    t.index ["funnel_board_id", "due_at"], name: "idx_funnel_tasks_on_board_due_at"
+    t.index ["funnel_board_id", "funnel_step_id", "rank"], name: "idx_funnel_tasks_on_board_step_rank"
+    t.index ["funnel_board_id", "priority"], name: "idx_funnel_tasks_on_board_priority"
+    t.index ["funnel_board_id"], name: "index_funnel_tasks_on_funnel_board_id"
+    t.index ["funnel_step_id"], name: "index_funnel_tasks_on_funnel_step_id"
+  end
+
   create_table "group_members", force: :cascade do |t|
     t.bigint "group_contact_id", null: false
     t.bigint "contact_id", null: false
@@ -1861,6 +1998,25 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_31_010000) do
   add_foreign_key "campaign_recipients", "campaigns", on_delete: :cascade
   add_foreign_key "campaign_recipients", "contacts", on_delete: :cascade
   add_foreign_key "campaign_recipients", "inboxes", on_delete: :cascade
+  add_foreign_key "funnel_board_inboxes", "funnel_boards", on_delete: :cascade
+  add_foreign_key "funnel_board_inboxes", "inboxes", on_delete: :cascade
+  add_foreign_key "funnel_board_members", "funnel_boards", on_delete: :cascade
+  add_foreign_key "funnel_board_members", "users", on_delete: :cascade
+  add_foreign_key "funnel_boards", "accounts", on_delete: :cascade
+  add_foreign_key "funnel_steps", "funnel_boards", on_delete: :cascade
+  add_foreign_key "funnel_task_assignees", "funnel_tasks", on_delete: :cascade
+  add_foreign_key "funnel_task_assignees", "users", on_delete: :cascade
+  add_foreign_key "funnel_task_contacts", "contacts", on_delete: :cascade
+  add_foreign_key "funnel_task_contacts", "funnel_tasks", on_delete: :cascade
+  add_foreign_key "funnel_task_conversations", "conversations", on_delete: :cascade
+  add_foreign_key "funnel_task_conversations", "funnel_tasks", on_delete: :cascade
+  add_foreign_key "funnel_task_events", "accounts", on_delete: :cascade
+  add_foreign_key "funnel_task_events", "funnel_tasks", on_delete: :cascade
+  add_foreign_key "funnel_task_labels", "funnel_tasks", on_delete: :cascade
+  add_foreign_key "funnel_task_labels", "labels", on_delete: :cascade
+  add_foreign_key "funnel_tasks", "accounts", on_delete: :cascade
+  add_foreign_key "funnel_tasks", "funnel_boards", on_delete: :cascade
+  add_foreign_key "funnel_tasks", "funnel_steps", on_delete: :restrict
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"

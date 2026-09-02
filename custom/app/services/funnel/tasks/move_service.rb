@@ -39,10 +39,24 @@ class Funnel::Tasks::MoveService
     { step_id: @task.funnel_step_id, rank: @task.rank&.to_s }
   end
 
+  # Os vizinhos reais sao relidos do banco a partir de uma das ancoras enviadas, em vez de
+  # confiar nos dois ids que o navegador mandou. Se outro card entrou no intervalo desde que o
+  # quadro foi desenhado, aqueles ids nao sao mais adjacentes: o ponto medio dos mesmos dois
+  # extremos se repete e dois cards terminam com o mesmo rank.
   def neighbours
     @neighbours ||= begin
       scope = Funnel::Task.where(funnel_step_id: @step.id).where.not(id: @task.id)
-      { after: @after_id && scope.find_by(id: @after_id), before: @before_id && scope.find_by(id: @before_id) }
+      after = @after_id.presence && scope.find_by(id: @after_id)
+      before = @before_id.presence && scope.find_by(id: @before_id)
+
+      if after
+        { after: after, before: scope.where('rank > ?', after.rank).order(:rank).first }
+      elsif before
+        { after: scope.where('rank < ?', before.rank).order(rank: :desc).first, before: before }
+      else
+        # Sem ancora o card vai para o fim da etapa.
+        { after: scope.order(:rank).last, before: nil }
+      end
     end
   end
 
