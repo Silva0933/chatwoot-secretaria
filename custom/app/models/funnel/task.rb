@@ -30,6 +30,12 @@ class Funnel::Task < ApplicationRecord
   before_validation :stamp_step_changed_at, on: :create
   after_update_commit :sync_conversation_link_columns, if: :conversation_link_columns_changed?
 
+  # O evento sai de callback e nao de cada controller de proposito: o quadro tambem e escrito
+  # pelo adaptador /kanban e pelo agente, e um disparo por chamador deixaria esses caminhos
+  # mudos. Aqui e o ponto por onde toda escrita passa.
+  after_commit :dispatch_created, on: :create
+  after_commit :dispatch_updated, on: :update
+
   scope :active, -> { where(archived_at: nil) }
   scope :archived, -> { where.not(archived_at: nil) }
   scope :in_step, ->(step_id) { where(funnel_step_id: step_id).order(:rank) }
@@ -54,7 +60,67 @@ class Funnel::Task < ApplicationRecord
     task_conversations.find_by(is_primary: true)&.conversation
   end
 
+  # Mesma forma que _task.json.jbuilder desenha, para o navegador poder trocar o card no lugar
+  # em vez de recarregar o quadro. Um spec compara as chaves dos dois; se um ganhar campo e o
+  # outro nao, ele quebra.
+  def push_event_data
+    scalar_event_data.merge(step_event_data).merge(association_event_data)
+  end
+
   private
+
+  def scalar_event_data
+    {
+      id: id, title: title, description: description, priority: priority,
+      funnel_board_id: funnel_board_id, funnel_step_id: funnel_step_id, rank: rank.to_s,
+      start_at: start_at, due_at: due_at, overdue: overdue?, archived_at: archived_at,
+      lock_version: lock_version, custom_attributes: custom_attributes,
+      created_at: created_at, updated_at: updated_at, step_changed_at: step_changed_at
+    }
+  end
+
+  def step_event_data
+    { board_name: board.name, step_name: step.name, step_color: step.color, step_stage_type: step.stage_type }
+  end
+
+  def association_event_data
+    {
+      assignees: assignees.map { |user| { id: user.id, name: user.name, avatar_url: user.avatar_url } },
+      labels: labels.map { |label| { id: label.id, title: label.title, color: label.color } },
+      contacts: contacts.map { |contact| { id: contact.id, name: contact.name } },
+      conversations: task_conversations.map do |link|
+        { id: link.conversation.display_id, conversation_id: link.conversation_id,
+          is_primary: link.is_primary, inbox_id: link.conversation.inbox_id }
+      end,
+      channel: channel_event_data
+    }
+  end
+
+  def channel_event_data
+    inbox = task_conversations.detect(&:is_primary)&.conversation&.inbox
+    return nil if inbox.blank?
+
+    { inbox_id: inbox.id, name: inbox.name, channel_type: inbox.channel_type,
+      provider: inbox.channel.try(:provider), medium: inbox.channel.try(:medium) }
+  end
+
+  def dispatch_created
+    Rails.configuration.dispatcher.dispatch('funnel.task.created', Time.zone.now, task: self)
+  end
+
+  # Arquivar e o nosso excluir, e mover e o que o quadro precisa distinguir para animar o card
+  # em vez de troca-lo no lugar.
+  def dispatch_updated
+    event = if saved_change_to_archived_at? && archived_at.present?
+              'funnel.task.deleted'
+            elsif saved_change_to_funnel_step_id?
+              'funnel.task.moved'
+            else
+              'funnel.task.updated'
+            end
+
+    Rails.configuration.dispatcher.dispatch(event, Time.zone.now, task: self)
+  end
 
   def assign_account_from_board
     self.account_id ||= board&.account_id

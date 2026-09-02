@@ -11,11 +11,34 @@ class Funnel::Board < ApplicationRecord
 
   scope :active, -> { where(archived_at: nil) }
 
+  after_commit :dispatch_updated, on: [:create, :update]
+
+  # Mudanca no quadro redesenha as colunas inteiras, entao o evento carrega o quadro com as
+  # etapas em vez de so o que mudou.
+  def push_event_data
+    {
+      id: id,
+      name: name,
+      description: description,
+      archived_at: archived_at,
+      steps: steps.ordered.map do |step|
+        { id: step.id, name: step.name, description: step.description, color: step.color,
+          rank: step.rank.to_s, stage_type: step.stage_type }
+      end
+    }
+  end
+
   def archived?
     archived_at.present?
   end
 
   def entry_step
     steps.stage_open.first
+  end
+
+  private
+
+  def dispatch_updated
+    Rails.configuration.dispatcher.dispatch('funnel.board.updated', Time.zone.now, board: self)
   end
 end

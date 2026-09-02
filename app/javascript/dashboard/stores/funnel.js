@@ -495,6 +495,39 @@ export const useFunnelStore = defineStore('funnel', {
       this.sortBy = sortBy;
     },
 
+    /**
+     * Eventos do websocket. Chegam para quem tem o quadro aberto, entao o primeiro cuidado e
+     * ignorar o que nao e do quadro em foco: um agente pode estar vendo o funil comercial
+     * enquanto outro mexe no de pos-atendimento.
+     *
+     * Nao ha reconciliacao com escrita local pendente porque nao existe: as acoes daqui so
+     * gravam na store depois da resposta do servidor, entao o evento sempre chega sobre um
+     * estado ja confirmado.
+     */
+    applyRemoteTask(payload) {
+      if (!payload || payload.funnelBoardId !== this.activeBoardId) return;
+
+      this.upsertTask(payload);
+    },
+
+    applyRemoteTaskRemoval(payload) {
+      if (!payload || payload.funnelBoardId !== this.activeBoardId) return;
+
+      this.removeTask(payload.id);
+    },
+
+    // O quadro chega inteiro porque mexer numa etapa reordena ou recolore as outras. Os cards
+    // nao vem junto: eles tem eventos proprios, e reenvia-los a cada renomeacao de coluna
+    // mandaria o quadro todo pelo websocket a cada tecla do formulario de etapa.
+    applyRemoteBoard(payload) {
+      if (!payload) return;
+
+      const index = this.boards.findIndex(board => board.id === payload.id);
+      if (index === -1) return;
+
+      this.boards[index] = { ...this.boards[index], ...payload };
+    },
+
     reset() {
       this.boards = [];
       this.tasks = [];

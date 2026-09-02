@@ -13,9 +13,17 @@ class Funnel::Step < ApplicationRecord
 
   before_validation :assign_default_rank, on: :create
 
+  # A etapa nao tem evento proprio: criar, renomear ou excluir uma coluna redesenha o quadro
+  # todo, entao o navegador recebe o quadro inteiro e nao precisa costurar a mudanca.
+  after_commit :dispatch_board_updated
+
   scope :ordered, -> { order(:rank) }
 
   private
+
+  def dispatch_board_updated
+    Rails.configuration.dispatcher.dispatch('funnel.board.updated', Time.zone.now, board: board.reload)
+  end
 
   def assign_default_rank
     return if rank.present? || board.blank?
