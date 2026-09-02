@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { OnClickOutside } from '@vueuse/components';
@@ -192,15 +192,7 @@ const openTaskDialog = task => taskDialogRef.value?.open({ task });
 const openNewTaskDialog = (step = null) =>
   taskDialogRef.value?.open({ step: step ?? steps.value[0] ?? null });
 
-watch(
-  () => route.params.accountId,
-  () => {
-    funnelStore.reset();
-    if (isModuleEnabled.value) loadBoards();
-  }
-);
-
-onMounted(() => {
+const loadEverything = () => {
   if (!isModuleEnabled.value) return;
 
   loadBoards();
@@ -208,7 +200,21 @@ onMounted(() => {
   // abertura de um card mostraria as duas listas vazias.
   store.dispatch('agents/get');
   store.dispatch('labels/get');
-});
+};
+
+// Watch e nao onMounted: currentAccount chega de forma assincrona, e num carregamento direto
+// da URL o componente monta antes dela estar na store. Um onMounted leria isModuleEnabled como
+// falso, desistiria para sempre, e o quadro apareceria vazio sem nenhuma requisicao ter saido.
+// O mesmo watch cobre a troca de conta, onde a lista precisa ser recarregada mesmo com o
+// modulo ligado nas duas.
+watch(
+  [isModuleEnabled, () => route.params.accountId],
+  ([, accountId], previous) => {
+    if (previous && previous[1] !== accountId) funnelStore.reset();
+    loadEverything();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
