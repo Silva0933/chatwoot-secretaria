@@ -1,0 +1,75 @@
+name: Preview image
+
+# Constroi a imagem do fork e avisa o Coolify para trocar a que esta rodando na VPS.
+#
+# O build acontece aqui e nao no servidor: assets:precompile pede ~4GB de RAM e a VPS ja roda
+# outros servicos. Ela so faz pull.
+#
+# So linux/amd64. Um build multiarquitetura passaria arm64 por emulacao QEMU e levaria horas
+# para um ambiente que roda num unico servidor x86.
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  push:
+    branches:
+      - feat/crm-kanban
+  workflow_dispatch:
+
+# Um push logo depois do outro cancela o build anterior em vez de enfileirar 20 minutos.
+concurrency:
+  group: preview-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR so aceita nome de repositorio em minusculas, e o dono aqui tem maiuscula.
+      - name: Compute image name
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:preview
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Disparado daqui e nao pelo webhook de git do Coolify: o webhook chegaria no push, com a
+      # imagem nova ainda em construcao, e o servidor faria pull da anterior.
+      - name: Trigger Coolify deploy
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          curl --fail-with-body -sS \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$COOLIFY_APP_UUID&force=true"
