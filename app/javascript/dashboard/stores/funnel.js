@@ -2,6 +2,7 @@ import camelcaseKeys from 'camelcase-keys';
 import snakecaseKeys from 'snakecase-keys';
 import { defineStore } from 'pinia';
 import FunnelBoardsApi from 'dashboard/api/funnel/boards';
+import FunnelConversationTasksApi from 'dashboard/api/funnel/conversationTasks';
 import FunnelStepsApi from 'dashboard/api/funnel/steps';
 import FunnelTasksApi from 'dashboard/api/funnel/tasks';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
@@ -17,6 +18,7 @@ const createUIFlags = () => ({
   movingTask: false,
   updatingAssociations: false,
   savingStep: false,
+  fetchingConversationTasks: false,
   fetchingEvents: false,
 });
 
@@ -37,6 +39,7 @@ export const useFunnelStore = defineStore('funnel', {
     tasks: [],
     activeBoardId: null,
     taskEvents: [],
+    conversationTasks: [],
     uiFlags: createUIFlags(),
   }),
 
@@ -389,10 +392,81 @@ export const useFunnelStore = defineStore('funnel', {
       this.taskEvents = [];
     },
 
+    /**
+     * Cards ligados a uma conversa. Lista separada de `tasks` de proposito: aquela e o quadro
+     * aberto, esta e o painel da conversa, e os dois podem estar em quadros diferentes na tela
+     * ao mesmo tempo.
+     */
+    async fetchConversationTasks(conversationId) {
+      this.setUIFlag({ fetchingConversationTasks: true });
+      try {
+        const { data } = await FunnelConversationTasksApi.get(conversationId);
+        this.conversationTasks = camelize(data.payload ?? data);
+        return this.conversationTasks;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ fetchingConversationTasks: false });
+      }
+    },
+
+    async createTaskFromConversation({
+      conversationId,
+      boardId,
+      funnelStepId = null,
+    }) {
+      this.setUIFlag({ creatingTask: true });
+      try {
+        const { data } = await FunnelConversationTasksApi.create(
+          conversationId,
+          {
+            boardId,
+            funnelStepId,
+          }
+        );
+        const task = camelize(data.payload ?? data);
+        this.conversationTasks = [...this.conversationTasks, task];
+        // O quadro aberto noutra aba precisa do card novo se for o mesmo quadro.
+        if (this.activeBoardId === task.funnelBoardId) this.upsertTask(task);
+        return task;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ creatingTask: false });
+      }
+    },
+
+    /**
+     * Move sem ancora: da conversa nao ha vizinhos para escolher, e o card vai para o fim da
+     * etapa de destino, que e o que o MoveService faz quando after_id e before_id vem vazios.
+     */
+    async moveConversationTask({ id, boardId, stepId, conversationId }) {
+      this.setUIFlag({ movingTask: true });
+      try {
+        const { data } = await FunnelTasksApi.move(boardId, id, {
+          stepId,
+          afterId: null,
+          beforeId: null,
+        });
+        const task = camelize(data.payload ?? data);
+        this.conversationTasks = this.conversationTasks.map(item =>
+          item.id === task.id ? task : item
+        );
+        if (this.activeBoardId === task.funnelBoardId) this.upsertTask(task);
+        return task;
+      } catch (error) {
+        await this.fetchConversationTasks(conversationId).catch(() => {});
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ movingTask: false });
+      }
+    },
+
     reset() {
       this.boards = [];
       this.tasks = [];
       this.taskEvents = [];
+      this.conversationTasks = [];
       this.activeBoardId = null;
       this.uiFlags = createUIFlags();
     },

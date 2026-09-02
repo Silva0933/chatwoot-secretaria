@@ -398,6 +398,11 @@ Rails.application.routes.draw do
           # Modulo Funnel (Kanban). Codigo em custom/, ver config/application.rb.
           if ChatwootApp.custom?
             namespace :funnel do
+              # O caminho inverso: o card visto e criado de dentro da conversa. O id aqui e o
+              # display_id, como no resto da API do core.
+              resources :conversations, only: [] do
+                resources :tasks, only: [:index, :create], controller: 'conversation_tasks'
+              end
               resources :boards, only: [:index, :show, :create, :update, :destroy] do
                 resources :steps, only: [:create, :update, :destroy] do
                   patch :reorder, on: :collection

@@ -4,6 +4,12 @@ json.description task.description
 json.priority task.priority
 json.funnel_board_id task.funnel_board_id
 json.funnel_step_id task.funnel_step_id
+# Nome do quadro e da etapa junto do card: no painel da conversa nao ha colunas em volta para
+# dizer onde ele esta, e "Agendado" sozinho nao diz de qual funil.
+json.board_name task.board.name
+json.step_name task.step.name
+json.step_color task.step.color
+json.step_stage_type task.step.stage_type
 # rank vai como string: em decimal(30,15) o JSON.parse do navegador perderia precisao no float.
 json.rank task.rank.to_s
 json.start_at task.start_at
@@ -18,9 +24,9 @@ json.updated_at task.updated_at
 # criado ha um mes que avancou ontem nao esta travado.
 json.step_changed_at task.step_changed_at
 
-json.assignees task.assignees.map { |user| { id: user.id, name: user.name, avatar_url: user.avatar_url } }
-json.labels task.labels.map { |label| { id: label.id, title: label.title, color: label.color } }
-json.contacts task.contacts.map { |contact| { id: contact.id, name: contact.name } }
+json.assignees(task.assignees.map { |user| { id: user.id, name: user.name, avatar_url: user.avatar_url } })
+json.labels(task.labels.map { |label| { id: label.id, title: label.title, color: label.color } })
+json.contacts(task.contacts.map { |contact| { id: contact.id, name: contact.name } })
 json.conversations task.task_conversations.map do |link|
   json.id link.conversation.display_id
   json.conversation_id link.conversation_id

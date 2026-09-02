@@ -153,6 +153,14 @@
       "SAVED": "Etapa salva.",
       "CREATED": "Etapa criada.",
       "DELETED": "Etapa excluída."
+    },
+    "CONVERSATION": {
+      "SIDEBAR_TITLE": "Funil",
+      "EMPTY": "Esta conversa ainda não está em nenhum funil.",
+      "CREATE": "Criar card no funil",
+      "PICK_BOARD": "Escolha o quadro",
+      "OPEN_BOARD": "Abrir no quadro",
+      "STEP_CHANGED": "Etapa alterada."
     }
   }
 }

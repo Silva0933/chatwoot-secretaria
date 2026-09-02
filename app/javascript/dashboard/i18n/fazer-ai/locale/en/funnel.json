@@ -153,6 +153,14 @@
       "SAVED": "Stage saved.",
       "CREATED": "Stage created.",
       "DELETED": "Stage deleted."
+    },
+    "CONVERSATION": {
+      "SIDEBAR_TITLE": "Funnel",
+      "EMPTY": "This conversation is not on any funnel yet.",
+      "CREATE": "Create a card",
+      "PICK_BOARD": "Pick the board",
+      "OPEN_BOARD": "Open on the board",
+      "STEP_CHANGED": "Stage changed."
     }
   }
 }

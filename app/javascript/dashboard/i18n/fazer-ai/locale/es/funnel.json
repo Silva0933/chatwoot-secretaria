@@ -153,6 +153,14 @@
       "SAVED": "Etapa guardada.",
       "CREATED": "Etapa creada.",
       "DELETED": "Etapa eliminada."
+    },
+    "CONVERSATION": {
+      "SIDEBAR_TITLE": "Embudo",
+      "EMPTY": "Esta conversación todavía no está en ningún embudo.",
+      "CREATE": "Crear tarjeta",
+      "PICK_BOARD": "Elija el tablero",
+      "OPEN_BOARD": "Abrir en el tablero",
+      "STEP_CHANGED": "Etapa modificada."
     }
   }
 }

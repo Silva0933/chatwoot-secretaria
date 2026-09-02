@@ -6,7 +6,7 @@
 # mesmo intervalo esgotam a precisao. Quando o gap fica abaixo de MIN_GAP, quem chama deve
 # rebalancear a etapa com +rebalance+ antes de gravar.
 module Funnel::Ranking
-  STEP = BigDecimal('65536')
+  STEP = BigDecimal(65_536)
   MIN_GAP = BigDecimal('0.000000000001') # 1e-12, tres ordens de grandeza acima do limite da coluna
 
   module_function
