@@ -397,6 +397,22 @@ Rails.application.routes.draw do
 
           # Modulo Funnel (Kanban). Codigo em custom/, ver config/application.rb.
           if ChatwootApp.custom?
+            # Adaptador para o contrato de Kanban da fazer.ai Pro. Existe para o projeto
+            # fazer.ai agents falar com este fork sem mudar o cliente dele; a regra de negocio
+            # continua toda em Funnel::.
+            namespace :kanban do
+              resources :boards, only: [:index, :show, :create, :update] do
+                member do
+                  post :update_inboxes
+                  post :update_agents
+                end
+                resources :steps, only: [:index, :create], controller: 'board_steps'
+              end
+              resources :tasks, only: [:index, :show, :create, :update] do
+                post :move, on: :member
+              end
+            end
+
             namespace :funnel do
               # O caminho inverso: o card visto e criado de dentro da conversa. O id aqui e o
               # display_id, como no resto da API do core.
