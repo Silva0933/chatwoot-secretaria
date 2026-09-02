@@ -5,7 +5,7 @@ class Api::V1::Accounts::Funnel::TasksController < Api::V1::Accounts::Funnel::Ba
 
   def index
     @tasks = policy_scope(Funnel::Task.where(funnel_board_id: @board.id).active)
-             .includes(:assignees, :labels, :contacts, task_conversations: :conversation)
+             .includes(:assignees, :labels, :contacts, task_conversations: { conversation: { inbox: :channel } })
              .order(:rank)
   end
 

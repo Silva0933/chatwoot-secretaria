@@ -12,9 +12,11 @@ import { useFunnelStore } from 'dashboard/stores/funnel';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
+import Select from 'dashboard/components-next/select/Select.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import BoardCreateDialog from '../components/BoardCreateDialog.vue';
 import FunnelBoardCanvas from '../components/FunnelBoardCanvas.vue';
+import StepDialog from '../components/StepDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 
 const { t } = useI18n();
@@ -28,6 +30,10 @@ const currentRole = useMapGetter('getCurrentRole');
 
 const boardCreateDialogRef = ref(null);
 const taskDialogRef = ref(null);
+const stepDialogRef = ref(null);
+const stepPendingDelete = ref(null);
+const deleteStepDialogRef = ref(null);
+const deleteTargetStepId = ref(null);
 const archiveBoardDialogRef = ref(null);
 const archiveTaskDialogRef = ref(null);
 const showBoardSwitcher = ref(false);
@@ -50,6 +56,13 @@ const canCreateTask = computed(
 const canManageBoard = computed(
   () => activeBoard.value?.permissions?.manageBoard ?? false
 );
+const canManageSettings = computed(
+  () => activeBoard.value?.permissions?.manageSettings ?? false
+);
+
+// O contador do cabecalho soma o quadro inteiro, nao a coluna: e a leitura de volume que a
+// referencia mostra ao lado do nome do funil.
+const totalTasks = computed(() => funnelStore.tasks.length);
 
 const isLoadingBoard = computed(
   () => uiFlags.value.fetchingBoards || uiFlags.value.fetchingTasks
@@ -187,6 +200,54 @@ const onMoveTask = async payload => {
   }
 };
 
+// Quantos cards a etapa que vai sair carrega: e o que decide se o dialogo pede um destino.
+const stepTaskCount = computed(
+  () => (tasksByStep.value[stepPendingDelete.value?.id] ?? []).length
+);
+
+const deleteTargetOptions = computed(() =>
+  steps.value
+    .filter(step => step.id !== stepPendingDelete.value?.id)
+    .map(step => ({ value: step.id, label: step.name }))
+);
+
+const onSubmitStep = async payload => {
+  try {
+    await funnelStore.saveStep(payload);
+    stepDialogRef.value?.close();
+    useAlert(payload.id ? t('FUNNEL.STEP.SAVED') : t('FUNNEL.STEP.CREATED'));
+  } catch (error) {
+    useAlert(error.message);
+  }
+};
+
+const onRequestDeleteStep = step => {
+  stepPendingDelete.value = step;
+  // Sugere a primeira etapa que sobra como destino, para o caso comum de nao haver escolha real.
+  deleteTargetStepId.value =
+    steps.value.find(item => item.id !== step.id)?.id ?? null;
+  stepDialogRef.value?.close();
+  deleteStepDialogRef.value?.open();
+};
+
+const onDeleteStep = async () => {
+  const step = stepPendingDelete.value;
+  if (!step) return;
+
+  try {
+    await funnelStore.deleteStep({
+      id: step.id,
+      targetStepId: deleteTargetStepId.value,
+    });
+    useAlert(t('FUNNEL.STEP.DELETED'));
+  } catch (error) {
+    useAlert(error.message);
+  } finally {
+    stepPendingDelete.value = null;
+    deleteStepDialogRef.value?.close();
+  }
+};
+
 const openTaskDialog = task => taskDialogRef.value?.open({ task });
 
 const openNewTaskDialog = (step = null) =>
@@ -239,6 +300,13 @@ watch(
           <h1 class="text-xl font-medium truncate text-n-slate-12">
             {{ activeBoard?.name || t('FUNNEL.HEADER') }}
           </h1>
+          <span
+            v-if="activeBoard"
+            class="px-2 py-0.5 text-xs font-medium rounded-full bg-n-alpha-2 text-n-slate-11"
+            :title="t('FUNNEL.BOARD.TOTAL')"
+          >
+            {{ totalTasks }}
+          </span>
           <OnClickOutside
             v-if="boards.length"
             @trigger="showBoardSwitcher = false"
@@ -324,10 +392,13 @@ watch(
         :steps="steps"
         :tasks-by-step="tasksByStep"
         :can-edit="canCreateTask"
+        :can-manage-steps="canManageSettings"
         class="grow min-h-0"
         @move="onMoveTask"
         @add-card="openNewTaskDialog"
         @open-task="openTaskDialog"
+        @configure-step="stepDialogRef?.open($event)"
+        @add-step="stepDialogRef?.open()"
       />
     </template>
 
@@ -346,6 +417,46 @@ watch(
       @submit="onSubmitTask"
       @archive="onRequestArchiveTask"
     />
+
+    <StepDialog
+      ref="stepDialogRef"
+      :steps="steps"
+      :is-loading="uiFlags.savingStep"
+      @submit="onSubmitStep"
+      @destroy="onRequestDeleteStep"
+    />
+
+    <Dialog
+      ref="deleteStepDialogRef"
+      type="alert"
+      :title="
+        t('FUNNEL.STEP.DELETE_CONFIRM_TITLE', { name: stepPendingDelete?.name })
+      "
+      :confirm-button-label="t('FUNNEL.STEP.DELETE_CONFIRM')"
+      :cancel-button-label="t('FUNNEL.STEP.CANCEL')"
+      :is-loading="uiFlags.savingStep"
+      @confirm="onDeleteStep"
+    >
+      <div class="flex flex-col gap-3">
+        <p class="text-sm text-n-slate-11">
+          {{
+            stepTaskCount
+              ? t('FUNNEL.STEP.DELETE_CONFIRM_MOVE', { count: stepTaskCount })
+              : t('FUNNEL.STEP.DELETE_CONFIRM_EMPTY')
+          }}
+        </p>
+        <label v-if="stepTaskCount" class="flex flex-col gap-1">
+          <span class="text-sm font-medium text-n-slate-12">
+            {{ t('FUNNEL.STEP.DELETE_TARGET_LABEL') }}
+          </span>
+          <Select
+            v-model="deleteTargetStepId"
+            :options="deleteTargetOptions"
+            :aria-label="t('FUNNEL.STEP.DELETE_TARGET_LABEL')"
+          />
+        </label>
+      </div>
+    </Dialog>
 
     <Dialog
       ref="archiveBoardDialogRef"

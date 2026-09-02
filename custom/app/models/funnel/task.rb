@@ -27,6 +27,7 @@ class Funnel::Task < ApplicationRecord
 
   before_validation :assign_account_from_board, on: :create
   before_validation :assign_default_rank, on: :create
+  before_validation :stamp_step_changed_at, on: :create
   after_update_commit :sync_conversation_link_columns, if: :conversation_link_columns_changed?
 
   scope :active, -> { where(archived_at: nil) }
@@ -59,6 +60,11 @@ class Funnel::Task < ApplicationRecord
     self.account_id ||= board&.account_id
   end
 
+  # Card novo esta na etapa desde agora; o MoveService reescreve a cada troca.
+  def stamp_step_changed_at
+    self.step_changed_at ||= Time.current
+  end
+
   def assign_default_rank
     return if rank.present? || funnel_step_id.blank?
 
@@ -85,7 +91,12 @@ class Funnel::Task < ApplicationRecord
 
   # Mantem as copias em funnel_task_conversations coerentes com o card. Sao elas que sustentam o
   # unique index parcial de um card ativo por conversa por quadro.
+  # update_all e proposital: e uma copia em massa de colunas denormalizadas, nenhuma validacao
+  # de TaskConversation depende delas, e o caminho por registro custaria uma query por conversa
+  # vinculada so para reescrever dois campos.
   def sync_conversation_link_columns
+    # rubocop:disable Rails/SkipsModelValidations
     task_conversations.update_all(active: archived_at.nil?, funnel_board_id: funnel_board_id, updated_at: Time.current)
+    # rubocop:enable Rails/SkipsModelValidations
   end
 end

@@ -15,7 +15,8 @@
         "DESCRIPTION": "El tablero sale de la lista y sus tarjetas dejan de aparecer. El historial de atención se conserva.",
         "CONFIRM": "Archivar",
         "CANCEL": "Cancelar"
-      }
+      },
+      "TOTAL": "tarjetas en el tablero"
     },
     "EMPTY_STATE": {
       "TITLE": "Aún no hay tableros",
@@ -31,7 +32,10 @@
       "DUE": "Vence el {date}",
       "CONVERSATIONS": "{count} conversación | {count} conversaciones",
       "OPEN": "Abrir tarjeta",
-      "NO_TITLE": "Sin título"
+      "NO_TITLE": "Sin título",
+      "TODAY": "Hoy",
+      "TOMORROW": "Mañana",
+      "TIME_IN_STEP": "Tiempo en esta etapa"
     },
     "PRIORITY": {
       "LABEL": "Prioridad",
@@ -126,6 +130,29 @@
         "CONVERSATION_PROMOTED": "Conversación principal modificada",
         "CONVERSATION_UNLINKED": "Conversación desvinculada"
       }
+    },
+    "STEP": {
+      "CONFIGURE": "Configurar etapa",
+      "NEW": "Nueva etapa",
+      "EDIT": "Editar etapa",
+      "NAME_LABEL": "Nombre",
+      "NAME_PLACEHOLDER": "Ej.: Esperando examen",
+      "COLOR_LABEL": "Color",
+      "TYPE_LABEL": "Tipo de etapa",
+      "TYPE_HINT": "Ganado y Perdido cierran la tarjeta; En curso la mantiene en el embudo.",
+      "SAVE": "Guardar",
+      "CREATE": "Crear etapa",
+      "CANCEL": "Cancelar",
+      "DELETE": "Eliminar etapa",
+      "DELETE_CONFIRM_TITLE": "¿Eliminar la etapa {name}?",
+      "DELETE_CONFIRM_EMPTY": "La etapa está vacía y puede eliminarse con seguridad.",
+      "DELETE_CONFIRM_MOVE": "Esta etapa tiene {count} tarjeta(s). Elija a dónde van.",
+      "DELETE_TARGET_LABEL": "Mover las tarjetas a",
+      "DELETE_CONFIRM": "Eliminar",
+      "DELETE_LAST": "Un tablero necesita al menos una etapa.",
+      "SAVED": "Etapa guardada.",
+      "CREATED": "Etapa creada.",
+      "DELETED": "Etapa eliminada."
     }
   }
 }

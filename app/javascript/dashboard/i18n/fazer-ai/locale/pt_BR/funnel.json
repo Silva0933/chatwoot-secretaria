@@ -15,7 +15,8 @@
         "DESCRIPTION": "O quadro sai da lista e os cards param de aparecer. O histórico de atendimento é preservado.",
         "CONFIRM": "Arquivar",
         "CANCEL": "Cancelar"
-      }
+      },
+      "TOTAL": "cards no quadro"
     },
     "EMPTY_STATE": {
       "TITLE": "Nenhum quadro por aqui",
@@ -31,7 +32,10 @@
       "DUE": "Vence em {date}",
       "CONVERSATIONS": "{count} conversa | {count} conversas",
       "OPEN": "Abrir card",
-      "NO_TITLE": "Sem título"
+      "NO_TITLE": "Sem título",
+      "TODAY": "Hoje",
+      "TOMORROW": "Amanhã",
+      "TIME_IN_STEP": "Tempo nesta etapa"
     },
     "PRIORITY": {
       "LABEL": "Prioridade",
@@ -126,6 +130,29 @@
         "CONVERSATION_PROMOTED": "Conversa principal alterada",
         "CONVERSATION_UNLINKED": "Conversa desvinculada"
       }
+    },
+    "STEP": {
+      "CONFIGURE": "Configurar etapa",
+      "NEW": "Nova etapa",
+      "EDIT": "Editar etapa",
+      "NAME_LABEL": "Nome",
+      "NAME_PLACEHOLDER": "Ex.: Aguardando exame",
+      "COLOR_LABEL": "Cor",
+      "TYPE_LABEL": "Tipo de etapa",
+      "TYPE_HINT": "Ganho e Perdido encerram o card; Em andamento o mantém no funil.",
+      "SAVE": "Salvar",
+      "CREATE": "Criar etapa",
+      "CANCEL": "Cancelar",
+      "DELETE": "Excluir etapa",
+      "DELETE_CONFIRM_TITLE": "Excluir a etapa {name}?",
+      "DELETE_CONFIRM_EMPTY": "A etapa está vazia e pode ser excluída com segurança.",
+      "DELETE_CONFIRM_MOVE": "Esta etapa tem {count} card(s). Escolha para onde eles vão.",
+      "DELETE_TARGET_LABEL": "Mover os cards para",
+      "DELETE_CONFIRM": "Excluir",
+      "DELETE_LAST": "Um quadro precisa de ao menos uma etapa.",
+      "SAVED": "Etapa salva.",
+      "CREATED": "Etapa criada.",
+      "DELETED": "Etapa excluída."
     }
   }
 }

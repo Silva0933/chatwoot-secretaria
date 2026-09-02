@@ -399,6 +399,9 @@ Rails.application.routes.draw do
           if ChatwootApp.custom?
             namespace :funnel do
               resources :boards, only: [:index, :show, :create, :update, :destroy] do
+                resources :steps, only: [:create, :update, :destroy] do
+                  patch :reorder, on: :collection
+                end
                 resources :tasks, only: [:index, :show, :create, :update, :destroy] do
                   patch :move, on: :member
                   # Conjuntos trocados por inteiro, entao resource no singular e so update.

@@ -2,6 +2,7 @@ import camelcaseKeys from 'camelcase-keys';
 import snakecaseKeys from 'snakecase-keys';
 import { defineStore } from 'pinia';
 import FunnelBoardsApi from 'dashboard/api/funnel/boards';
+import FunnelStepsApi from 'dashboard/api/funnel/steps';
 import FunnelTasksApi from 'dashboard/api/funnel/tasks';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
 import { sortByRank, groupTasksByStep } from 'dashboard/helper/funnelHelper';
@@ -15,6 +16,7 @@ const createUIFlags = () => ({
   updatingTask: false,
   movingTask: false,
   updatingAssociations: false,
+  savingStep: false,
   fetchingEvents: false,
 });
 
@@ -146,6 +148,49 @@ export const useFunnelStore = defineStore('funnel', {
         return throwErrorMessage(error);
       } finally {
         this.setUIFlag({ updatingBoard: false });
+      }
+    },
+
+    /**
+     * Toda acao de etapa devolve o quadro inteiro, porque mexer numa coluna muda a ordem, a cor
+     * ou a existencia das outras. Recarrega os cards depois de excluir: os que estavam na etapa
+     * que saiu foram realocados pelo servidor.
+     */
+    async saveStep({ id, boardId = this.activeBoardId, ...attributes }) {
+      this.setUIFlag({ savingStep: true });
+      try {
+        const payload = {
+          name: attributes.name,
+          color: attributes.color,
+          stage_type: attributes.stageType,
+        };
+        const { data } = id
+          ? await FunnelStepsApi.update(boardId, id, payload)
+          : await FunnelStepsApi.create(boardId, payload);
+        this.upsertBoard(camelize(data.payload ?? data));
+        return this.getActiveBoard;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ savingStep: false });
+      }
+    },
+
+    async deleteStep({
+      id,
+      targetStepId = null,
+      boardId = this.activeBoardId,
+    }) {
+      this.setUIFlag({ savingStep: true });
+      try {
+        const { data } = await FunnelStepsApi.delete(boardId, id, targetStepId);
+        this.upsertBoard(camelize(data.payload ?? data));
+        await this.fetchTasks(boardId);
+        return this.getActiveBoard;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ savingStep: false });
       }
     },
 

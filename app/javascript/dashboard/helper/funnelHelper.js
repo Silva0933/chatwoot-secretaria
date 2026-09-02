@@ -93,6 +93,68 @@ export const neighboursAt = (orderedTasks, taskId) => {
   };
 };
 
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/**
+ * Ha quanto tempo o card esta parado na etapa, no formato curto do quadro: 55m, 3h, 12d.
+ *
+ * Curto de proposito. E um sinal de triagem lido de relance em dezenas de cards ao mesmo tempo,
+ * nao uma data — "ha 3 dias" ocuparia a linha inteira e diria a mesma coisa.
+ */
+export const timeInStep = (stepChangedAt, now = Date.now()) => {
+  if (!stepChangedAt) return '';
+
+  const since = new Date(stepChangedAt).getTime();
+  if (Number.isNaN(since)) return '';
+
+  const elapsed = Math.max(now - since, 0);
+  if (elapsed < HOUR) return `${Math.max(Math.floor(elapsed / MINUTE), 1)}m`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
+
+  return `${Math.floor(elapsed / DAY)}d`;
+};
+
+export const DUE_STATES = {
+  OVERDUE: 'overdue',
+  TODAY: 'today',
+  TOMORROW: 'tomorrow',
+  FUTURE: 'future',
+};
+
+/**
+ * Classifica o vencimento. A comparacao e por dia do calendario e nao por diferenca de horas:
+ * as 23h, algo que vence as 8h de amanha esta a nove horas de distancia, mas para quem le o
+ * quadro e "amanha", nao "hoje".
+ */
+export const dueState = (dueAt, now = new Date()) => {
+  if (!dueAt) return null;
+
+  const due = new Date(dueAt);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const startOfDay = date =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+  const days = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
+  if (due.getTime() < now.getTime() && days <= 0) return DUE_STATES.OVERDUE;
+  if (days <= 0) return DUE_STATES.TODAY;
+  if (days === 1) return DUE_STATES.TOMORROW;
+
+  return DUE_STATES.FUTURE;
+};
+
+// Prioridade nao pode depender so de cor: o PRD pede icone e texto por acessibilidade, e um
+// quadro cheio de bolinhas coloridas nao se le em escala de cinza nem por quem nao distingue
+// vermelho de verde.
+export const PRIORITY_META = {
+  urgent: { icon: 'i-lucide-chevrons-up', tone: 'ruby' },
+  high: { icon: 'i-lucide-chevron-up', tone: 'amber' },
+  medium: { icon: 'i-lucide-equal', tone: 'blue' },
+  low: { icon: 'i-lucide-chevron-down', tone: 'slate' },
+};
+
 export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
 export const STAGE_TYPES = ['open', 'won', 'lost'];

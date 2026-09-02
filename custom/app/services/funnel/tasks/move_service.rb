@@ -7,6 +7,9 @@
 class Funnel::Tasks::MoveService
   class InvalidStep < StandardError; end
 
+  # rubocop:disable Metrics/ParameterLists
+  # Seis argumentos, todos nomeados: o risco que o cop cobre e trocar a ordem de posicionais, o
+  # que aqui nao existe. Agrupar em um objeto de contexto so afastaria o dado de quem o usa.
   def initialize(task:, step:, after_id: nil, before_id: nil, actor: nil, source: 'web')
     @task = task
     @step = step
@@ -15,6 +18,7 @@ class Funnel::Tasks::MoveService
     @actor = actor
     @source = source
   end
+  # rubocop:enable Metrics/ParameterLists
 
   def perform
     raise InvalidStep, 'step must belong to the same board as the task' if @step.funnel_board_id != @task.funnel_board_id
@@ -26,7 +30,11 @@ class Funnel::Tasks::MoveService
       # que o navegador tinha, que pode estar velho.
       previous_state = capture_state
       rebalance_step if rebalance_needed?
-      @task.update!(step: @step, rank: target_rank)
+      # step_changed_at so reinicia quando a etapa muda: reordenar dentro da mesma coluna nao
+      # significa que o card avancou, e zerar o relogio ali esconderia card parado ha dias.
+      attributes = { step: @step, rank: target_rank }
+      attributes[:step_changed_at] = Time.current if @task.funnel_step_id != @step.id
+      @task.update!(attributes)
     end
 
     record_event(previous_state)
@@ -68,8 +76,10 @@ class Funnel::Tasks::MoveService
   # caber outro ponto medio. Roda dentro do lock do card que esta sendo movido.
   def rebalance_step
     ordered_ids = Funnel::Task.where(funnel_step_id: @step.id).order(:rank, :id).pluck(:id)
+    # update_all porque isto reescreve o rank de toda a etapa de uma vez, e rank e posicao, nao
+    # regra de negocio: nenhuma validacao do card olha para ele.
     Funnel::Ranking.rebalance(ordered_ids).each do |id, new_rank|
-      Funnel::Task.where(id: id).update_all(rank: new_rank)
+      Funnel::Task.where(id: id).update_all(rank: new_rank) # rubocop:disable Rails/SkipsModelValidations
     end
     @neighbours = nil
   end

@@ -3,6 +3,9 @@ import {
   sortByRank,
   groupTasksByStep,
   neighboursAt,
+  timeInStep,
+  dueState,
+  DUE_STATES,
 } from '../funnelHelper';
 
 describe('funnelHelper', () => {
@@ -66,6 +69,63 @@ describe('funnelHelper', () => {
       ]);
 
       expect(grouped).toEqual({ 10: [], 20: [] });
+    });
+  });
+
+  describe('timeInStep', () => {
+    const now = new Date('2026-03-10T12:00:00Z').getTime();
+    const ago = ms => new Date(now - ms).toISOString();
+
+    it('counts minutes below an hour', () => {
+      expect(timeInStep(ago(55 * 60 * 1000), now)).toBe('55m');
+    });
+
+    it('counts hours below a day', () => {
+      expect(timeInStep(ago(3 * 60 * 60 * 1000), now)).toBe('3h');
+    });
+
+    it('counts days beyond that', () => {
+      expect(timeInStep(ago(12 * 24 * 60 * 60 * 1000), now)).toBe('12d');
+    });
+
+    // Card recem movido mostra 1m e nao 0m: zero parece defeito, e o minuto seguinte corrige.
+    it('never shows zero for a card just moved', () => {
+      expect(timeInStep(ago(2000), now)).toBe('1m');
+    });
+
+    it('returns empty for a missing or invalid timestamp', () => {
+      expect(timeInStep(null, now)).toBe('');
+      expect(timeInStep('nao e data', now)).toBe('');
+    });
+  });
+
+  describe('dueState', () => {
+    const now = new Date('2026-03-10T23:00:00');
+
+    it('marks a past due date as overdue', () => {
+      expect(dueState('2026-03-09T10:00:00', now)).toBe(DUE_STATES.OVERDUE);
+    });
+
+    it('marks today as today even when the hour already passed', () => {
+      expect(dueState('2026-03-10T08:00:00', now)).toBe(DUE_STATES.OVERDUE);
+    });
+
+    it('marks a later hour today as today', () => {
+      expect(dueState('2026-03-10T23:30:00', now)).toBe(DUE_STATES.TODAY);
+    });
+
+    // As 23h, algo que vence as 8h de amanha esta a nove horas — mas para quem le o quadro e
+    // "amanha". A classificacao e por dia do calendario, nao por diferenca de horas.
+    it('marks tomorrow morning as tomorrow and not today', () => {
+      expect(dueState('2026-03-11T08:00:00', now)).toBe(DUE_STATES.TOMORROW);
+    });
+
+    it('marks anything further out as future', () => {
+      expect(dueState('2026-03-20T08:00:00', now)).toBe(DUE_STATES.FUTURE);
+    });
+
+    it('returns null without a due date', () => {
+      expect(dueState(null, now)).toBeNull();
     });
   });
 

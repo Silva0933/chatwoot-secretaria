@@ -1,16 +1,28 @@
 <script setup>
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { neighboursAt } from 'dashboard/helper/funnelHelper';
 
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 import FunnelColumn from './FunnelColumn.vue';
 
 const props = defineProps({
   steps: { type: Array, default: () => [] },
   tasksByStep: { type: Object, default: () => ({}) },
   canEdit: { type: Boolean, default: false },
+  canManageSteps: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['move', 'addCard', 'openTask']);
+const emit = defineEmits([
+  'move',
+  'addCard',
+  'openTask',
+  'configureStep',
+  'addStep',
+]);
+
+const { t } = useI18n();
+const addStepLabel = t('FUNNEL.STEP.NEW');
 
 // O quadro trabalha sobre uma copia das colunas. O vuedraggable precisa mutar o array para
 // mostrar o card na posicao nova durante o arrasto, e mutar o getter da store faria a coluna
@@ -50,9 +62,22 @@ const onColumnChange = ({ stepId, event }) => {
       :step="step"
       :tasks="columns[step.id] ?? []"
       :can-edit="canEdit"
+      :can-manage-steps="canManageSteps"
       @change="onColumnChange"
       @add-card="$emit('addCard', $event)"
       @open-task="$emit('openTask', $event)"
+      @configure="$emit('configureStep', $event)"
     />
+
+    <button
+      v-if="canManageSteps"
+      type="button"
+      class="flex items-center justify-center gap-2 w-14 shrink-0 text-sm rounded-xl border border-dashed border-n-weak text-n-slate-11 hover:text-n-slate-12 hover:border-n-slate-6"
+      :aria-label="addStepLabel"
+      :title="addStepLabel"
+      @click="$emit('addStep')"
+    >
+      <Icon icon="i-lucide-plus" class="size-4" />
+    </button>
   </div>
 </template>
