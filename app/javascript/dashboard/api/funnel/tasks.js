@@ -40,6 +40,48 @@ class FunnelTasksAPI extends ApiClient {
       before_id: beforeId,
     });
   }
+
+  // PUT troca o conjunto inteiro: o multiselect do card sabe o estado final, nao o delta.
+  replaceAssignees(boardId, id, userIds) {
+    return axios.put(`${this.tasksUrl(boardId)}/${id}/assignees`, {
+      user_ids: userIds,
+    });
+  }
+
+  replaceLabels(boardId, id, labelIds) {
+    return axios.put(`${this.tasksUrl(boardId)}/${id}/labels`, {
+      label_ids: labelIds,
+    });
+  }
+
+  replaceContacts(boardId, id, contactIds) {
+    return axios.put(`${this.tasksUrl(boardId)}/${id}/contacts`, {
+      contact_ids: contactIds,
+    });
+  }
+
+  // displayId e o numero da conversa que o agente ve no Chatwoot, nao o id interno.
+  linkConversation(boardId, id, displayId) {
+    return axios.post(`${this.tasksUrl(boardId)}/${id}/conversations`, {
+      conversation_id: displayId,
+    });
+  }
+
+  promoteConversation(boardId, id, displayId) {
+    return axios.patch(
+      `${this.tasksUrl(boardId)}/${id}/conversations/${displayId}`
+    );
+  }
+
+  unlinkConversation(boardId, id, displayId) {
+    return axios.delete(
+      `${this.tasksUrl(boardId)}/${id}/conversations/${displayId}`
+    );
+  }
+
+  events(boardId, id) {
+    return axios.get(`${this.tasksUrl(boardId)}/${id}/events`);
+  }
 }
 
 export default new FunnelTasksAPI();

@@ -94,6 +94,38 @@
       "TASK_UPDATED": "Card atualizado.",
       "TASK_ARCHIVED": "Card arquivado.",
       "MOVE_ERROR": "Não foi possível mover o card. O quadro foi recarregado."
+    },
+    "ASSOCIATIONS": {
+      "ASSIGNEES_PLACEHOLDER": "Escolha os responsáveis",
+      "LABELS_PLACEHOLDER": "Escolha as etiquetas",
+      "SEARCH": "Buscar...",
+      "SEARCHING": "Buscando...",
+      "NO_AGENTS": "Nenhum agente encontrado",
+      "NO_LABELS": "Nenhuma etiqueta encontrada",
+      "CONTACT_PLACEHOLDER": "Busque um contato pelo nome, e-mail ou telefone",
+      "REMOVE_CONTACT": "Remover contato",
+      "CONVERSATIONS": "Conversas",
+      "NO_CONVERSATIONS": "Nenhuma conversa vinculada a este card",
+      "CONVERSATION_PLACEHOLDER": "Número da conversa",
+      "LINK": "Vincular",
+      "UNLINK": "Desvincular",
+      "PRIMARY": "Principal",
+      "MAKE_PRIMARY": "Tornar principal",
+      "AFTER_CREATE": "Responsáveis, etiquetas, contatos e conversas ficam disponíveis depois que o card for criado."
+    },
+    "ACTIVITY": {
+      "TITLE": "Histórico",
+      "EMPTY": "Nada aconteceu com este card ainda.",
+      "SYSTEM": "Sistema",
+      "TYPES": {
+        "MOVED": "Card movido de etapa",
+        "ASSIGNEES_REPLACED": "Responsáveis alterados",
+        "LABELS_REPLACED": "Etiquetas alteradas",
+        "CONTACTS_REPLACED": "Contatos alterados",
+        "CONVERSATION_LINKED": "Conversa vinculada",
+        "CONVERSATION_PROMOTED": "Conversa principal alterada",
+        "CONVERSATION_UNLINKED": "Conversa desvinculada"
+      }
     }
   }
 }

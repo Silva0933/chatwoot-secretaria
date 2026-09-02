@@ -6,7 +6,7 @@ import { OnClickOutside } from '@vueuse/components';
 
 import { useAlert } from 'dashboard/composables';
 import { useAccount } from 'dashboard/composables/useAccount';
-import { useMapGetter } from 'dashboard/composables/store';
+import { useMapGetter, useStore } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
 
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -21,6 +21,7 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const funnelStore = useFunnelStore();
+const store = useStore();
 const { currentAccount } = useAccount();
 
 const currentRole = useMapGetter('getCurrentRole');
@@ -200,7 +201,13 @@ watch(
 );
 
 onMounted(() => {
-  if (isModuleEnabled.value) loadBoards();
+  if (!isModuleEnabled.value) return;
+
+  loadBoards();
+  // Os multiselects do card escolhem entre agentes e etiquetas da conta; sem isso a primeira
+  // abertura de um card mostraria as duas listas vazias.
+  store.dispatch('agents/get');
+  store.dispatch('labels/get');
 });
 </script>
 
@@ -329,6 +336,7 @@ onMounted(() => {
       :steps="steps"
       :is-loading="isSavingTask"
       :can-archive="canManageBoard"
+      :can-edit="canCreateTask"
       @submit="onSubmitTask"
       @archive="onRequestArchiveTask"
     />

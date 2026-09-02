@@ -94,6 +94,38 @@
       "TASK_UPDATED": "Tarjeta actualizada.",
       "TASK_ARCHIVED": "Tarjeta archivada.",
       "MOVE_ERROR": "No se pudo mover la tarjeta. El tablero se recargó."
+    },
+    "ASSOCIATIONS": {
+      "ASSIGNEES_PLACEHOLDER": "Elija los responsables",
+      "LABELS_PLACEHOLDER": "Elija las etiquetas",
+      "SEARCH": "Buscar...",
+      "SEARCHING": "Buscando...",
+      "NO_AGENTS": "No se encontró ningún agente",
+      "NO_LABELS": "No se encontró ninguna etiqueta",
+      "CONTACT_PLACEHOLDER": "Busque un contacto por nombre, correo o teléfono",
+      "REMOVE_CONTACT": "Quitar contacto",
+      "CONVERSATIONS": "Conversaciones",
+      "NO_CONVERSATIONS": "Ninguna conversación vinculada a esta tarjeta",
+      "CONVERSATION_PLACEHOLDER": "Número de la conversación",
+      "LINK": "Vincular",
+      "UNLINK": "Desvincular",
+      "PRIMARY": "Principal",
+      "MAKE_PRIMARY": "Marcar como principal",
+      "AFTER_CREATE": "Responsables, etiquetas, contactos y conversaciones estarán disponibles después de crear la tarjeta."
+    },
+    "ACTIVITY": {
+      "TITLE": "Historial",
+      "EMPTY": "Todavía no ha pasado nada con esta tarjeta.",
+      "SYSTEM": "Sistema",
+      "TYPES": {
+        "MOVED": "Tarjeta movida de etapa",
+        "ASSIGNEES_REPLACED": "Responsables modificados",
+        "LABELS_REPLACED": "Etiquetas modificadas",
+        "CONTACTS_REPLACED": "Contactos modificados",
+        "CONVERSATION_LINKED": "Conversación vinculada",
+        "CONVERSATION_PROMOTED": "Conversación principal modificada",
+        "CONVERSATION_UNLINKED": "Conversación desvinculada"
+      }
     }
   }
 }

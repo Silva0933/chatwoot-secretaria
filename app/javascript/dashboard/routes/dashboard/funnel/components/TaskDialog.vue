@@ -7,17 +7,22 @@ import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Select from 'dashboard/components-next/select/Select.vue';
 import TextArea from 'dashboard/components-next/textarea/TextArea.vue';
+import TaskActivity from './TaskActivity.vue';
+import TaskAssociations from './TaskAssociations.vue';
 import { TASK_PRIORITIES } from 'dashboard/helper/funnelHelper';
+import { useFunnelStore } from 'dashboard/stores/funnel';
 
 const props = defineProps({
   steps: { type: Array, default: () => [] },
   isLoading: { type: Boolean, default: false },
   canArchive: { type: Boolean, default: false },
+  canEdit: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['submit', 'archive']);
 
 const { t } = useI18n();
+const funnelStore = useFunnelStore();
 
 const dialogRef = ref(null);
 const editingTask = ref(null);
@@ -31,6 +36,12 @@ const form = reactive({
 });
 
 const isEditing = computed(() => Boolean(editingTask.value));
+
+// As associacoes gravam na hora e devolvem o card inteiro. Ler da store e nao de editingTask
+// faz o painel refletir a gravacao sem o dialogo precisar reabrir.
+const liveTask = computed(() =>
+  editingTask.value ? funnelStore.getTask(editingTask.value.id) : null
+);
 const isInvalid = computed(() => !form.title.trim());
 
 const stepOptions = computed(() =>
@@ -64,6 +75,7 @@ const fromLocalInput = value => {
 };
 
 const resetForm = () => {
+  funnelStore.clearTaskEvents();
   editingTask.value = null;
   form.title = '';
   form.description = '';
@@ -113,7 +125,7 @@ defineExpose({ open, close });
 <template>
   <Dialog
     ref="dialogRef"
-    width="lg"
+    width="3xl"
     :title="
       isEditing ? t('FUNNEL.TASK.EDIT_TITLE') : t('FUNNEL.TASK.CREATE_TITLE')
     "
@@ -126,54 +138,66 @@ defineExpose({ open, close });
     @confirm="handleConfirm"
     @close="resetForm"
   >
-    <div class="flex flex-col gap-4">
-      <Input
-        v-model="form.title"
-        :label="t('FUNNEL.TASK.TITLE_LABEL')"
-        :placeholder="t('FUNNEL.TASK.TITLE_PLACEHOLDER')"
-        :message="isInvalid ? t('FUNNEL.TASK.TITLE_REQUIRED') : ''"
-        :message-type="isInvalid ? 'error' : 'info'"
-        :disabled="isLoading"
-        autofocus
-      />
-      <TextArea
-        v-model="form.description"
-        :label="t('FUNNEL.TASK.DESCRIPTION_LABEL')"
-        :placeholder="t('FUNNEL.TASK.DESCRIPTION_PLACEHOLDER')"
-        :disabled="isLoading"
-        :max-length="1000"
-        auto-height
-      />
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label class="flex flex-col gap-1">
-          <span class="text-sm font-medium text-n-slate-12">
-            {{ t('FUNNEL.TASK.STEP_LABEL') }}
-          </span>
-          <Select
-            v-model="form.funnelStepId"
-            :options="stepOptions"
-            :disabled="isLoading"
-            :aria-label="t('FUNNEL.TASK.STEP_LABEL')"
-          />
-        </label>
-        <label class="flex flex-col gap-1">
-          <span class="text-sm font-medium text-n-slate-12">
-            {{ t('FUNNEL.PRIORITY.LABEL') }}
-          </span>
-          <Select
-            v-model="form.priority"
-            :options="priorityOptions"
-            :disabled="isLoading"
-            :aria-label="t('FUNNEL.PRIORITY.LABEL')"
-          />
-        </label>
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div class="flex flex-col gap-4">
+        <Input
+          v-model="form.title"
+          :label="t('FUNNEL.TASK.TITLE_LABEL')"
+          :placeholder="t('FUNNEL.TASK.TITLE_PLACEHOLDER')"
+          :message="isInvalid ? t('FUNNEL.TASK.TITLE_REQUIRED') : ''"
+          :message-type="isInvalid ? 'error' : 'info'"
+          :disabled="isLoading"
+          autofocus
+        />
+        <TextArea
+          v-model="form.description"
+          :label="t('FUNNEL.TASK.DESCRIPTION_LABEL')"
+          :placeholder="t('FUNNEL.TASK.DESCRIPTION_PLACEHOLDER')"
+          :disabled="isLoading"
+          :max-length="1000"
+          auto-height
+        />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ t('FUNNEL.TASK.STEP_LABEL') }}
+            </span>
+            <Select
+              v-model="form.funnelStepId"
+              :options="stepOptions"
+              :disabled="isLoading"
+              :aria-label="t('FUNNEL.TASK.STEP_LABEL')"
+            />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ t('FUNNEL.PRIORITY.LABEL') }}
+            </span>
+            <Select
+              v-model="form.priority"
+              :options="priorityOptions"
+              :disabled="isLoading"
+              :aria-label="t('FUNNEL.PRIORITY.LABEL')"
+            />
+          </label>
+        </div>
+        <Input
+          v-model="form.dueAt"
+          type="datetime-local"
+          :label="t('FUNNEL.TASK.DUE_AT_LABEL')"
+          :disabled="isLoading"
+        />
       </div>
-      <Input
-        v-model="form.dueAt"
-        type="datetime-local"
-        :label="t('FUNNEL.TASK.DUE_AT_LABEL')"
-        :disabled="isLoading"
-      />
+
+      <!-- Associacoes so existem para card ja gravado: sem id nao ha onde pendurar responsavel
+           nem conversa. No card novo a coluna explica isso em vez de ficar vazia. -->
+      <div v-if="isEditing && liveTask" class="flex flex-col gap-5">
+        <TaskAssociations :task="liveTask" :can-edit="canEdit" />
+        <TaskActivity :task-id="liveTask.id" />
+      </div>
+      <p v-else class="text-xs text-n-slate-10">
+        {{ t('FUNNEL.ASSOCIATIONS.AFTER_CREATE') }}
+      </p>
     </div>
 
     <template #footer>

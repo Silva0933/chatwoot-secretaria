@@ -14,6 +14,8 @@ const createUIFlags = () => ({
   creatingTask: false,
   updatingTask: false,
   movingTask: false,
+  updatingAssociations: false,
+  fetchingEvents: false,
 });
 
 // stopPaths em custom_attributes: as chaves ali sao do cliente, camelizar renomearia dado dele.
@@ -32,6 +34,7 @@ export const useFunnelStore = defineStore('funnel', {
     boards: [],
     tasks: [],
     activeBoardId: null,
+    taskEvents: [],
     uiFlags: createUIFlags(),
   }),
 
@@ -245,9 +248,106 @@ export const useFunnelStore = defineStore('funnel', {
       }
     },
 
+    /**
+     * Responsaveis, etiquetas e contatos sao gravados na hora, um endpoint por conjunto, em vez
+     * de entrarem no submit do formulario: sao listas independentes e a resposta ja devolve o
+     * card inteiro atualizado, entao nao ha o que reconciliar.
+     */
+    async replaceAssociation({ id, kind, ids, boardId = this.activeBoardId }) {
+      const call = {
+        assignees: FunnelTasksApi.replaceAssignees,
+        labels: FunnelTasksApi.replaceLabels,
+        contacts: FunnelTasksApi.replaceContacts,
+      }[kind];
+
+      this.setUIFlag({ updatingAssociations: true });
+      try {
+        const { data } = await call.call(FunnelTasksApi, boardId, id, ids);
+        const task = camelize(data.payload ?? data);
+        this.upsertTask(task);
+        return task;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ updatingAssociations: false });
+      }
+    },
+
+    async linkConversation({ id, displayId, boardId = this.activeBoardId }) {
+      this.setUIFlag({ updatingAssociations: true });
+      try {
+        const { data } = await FunnelTasksApi.linkConversation(
+          boardId,
+          id,
+          displayId
+        );
+        const task = camelize(data.payload ?? data);
+        this.upsertTask(task);
+        return task;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ updatingAssociations: false });
+      }
+    },
+
+    async promoteConversation({ id, displayId, boardId = this.activeBoardId }) {
+      this.setUIFlag({ updatingAssociations: true });
+      try {
+        const { data } = await FunnelTasksApi.promoteConversation(
+          boardId,
+          id,
+          displayId
+        );
+        const task = camelize(data.payload ?? data);
+        this.upsertTask(task);
+        return task;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ updatingAssociations: false });
+      }
+    },
+
+    async unlinkConversation({ id, displayId, boardId = this.activeBoardId }) {
+      this.setUIFlag({ updatingAssociations: true });
+      try {
+        const { data } = await FunnelTasksApi.unlinkConversation(
+          boardId,
+          id,
+          displayId
+        );
+        const task = camelize(data.payload ?? data);
+        this.upsertTask(task);
+        return task;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ updatingAssociations: false });
+      }
+    },
+
+    async fetchTaskEvents({ id, boardId = this.activeBoardId }) {
+      this.setUIFlag({ fetchingEvents: true });
+      try {
+        const { data } = await FunnelTasksApi.events(boardId, id);
+        this.taskEvents = camelize(data.payload ?? data);
+        return this.taskEvents;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ fetchingEvents: false });
+      }
+    },
+
+    clearTaskEvents() {
+      this.taskEvents = [];
+    },
+
     reset() {
       this.boards = [];
       this.tasks = [];
+      this.taskEvents = [];
       this.activeBoardId = null;
       this.uiFlags = createUIFlags();
     },

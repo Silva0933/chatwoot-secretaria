@@ -94,6 +94,38 @@
       "TASK_UPDATED": "Card updated.",
       "TASK_ARCHIVED": "Card archived.",
       "MOVE_ERROR": "Could not move the card. The board was reloaded."
+    },
+    "ASSOCIATIONS": {
+      "ASSIGNEES_PLACEHOLDER": "Pick the assignees",
+      "LABELS_PLACEHOLDER": "Pick the labels",
+      "SEARCH": "Search...",
+      "SEARCHING": "Searching...",
+      "NO_AGENTS": "No agent found",
+      "NO_LABELS": "No label found",
+      "CONTACT_PLACEHOLDER": "Search a contact by name, email or phone",
+      "REMOVE_CONTACT": "Remove contact",
+      "CONVERSATIONS": "Conversations",
+      "NO_CONVERSATIONS": "No conversation linked to this card",
+      "CONVERSATION_PLACEHOLDER": "Conversation number",
+      "LINK": "Link",
+      "UNLINK": "Unlink",
+      "PRIMARY": "Primary",
+      "MAKE_PRIMARY": "Make primary",
+      "AFTER_CREATE": "Assignees, labels, contacts and conversations become available once the card is created."
+    },
+    "ACTIVITY": {
+      "TITLE": "Activity",
+      "EMPTY": "Nothing has happened to this card yet.",
+      "SYSTEM": "System",
+      "TYPES": {
+        "MOVED": "Card moved to another stage",
+        "ASSIGNEES_REPLACED": "Assignees changed",
+        "LABELS_REPLACED": "Labels changed",
+        "CONTACTS_REPLACED": "Contacts changed",
+        "CONVERSATION_LINKED": "Conversation linked",
+        "CONVERSATION_PROMOTED": "Primary conversation changed",
+        "CONVERSATION_UNLINKED": "Conversation unlinked"
+      }
     }
   }
 }
