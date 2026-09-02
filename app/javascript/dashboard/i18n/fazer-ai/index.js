@@ -11,7 +11,7 @@
  * changes, which also keeps CE -> Pro merges conflict-free.
  *
  * File naming: a namespace that is entirely ours gets its own file
- * (`kanban.json`, `internalChat.json`); keys we add inside an upstream
+ * (`funnel.json`, `internalChat.json`); keys we add inside an upstream
  * namespace live in a file named after the upstream file they extend
  * (`conversation.json` extends `../locale/<lang>/conversation.json`).
  */

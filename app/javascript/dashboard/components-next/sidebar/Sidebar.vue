@@ -525,13 +525,6 @@ const menuItems = computed(() => {
         count: 'internalChat/getUnreadCount',
       },
     },
-    {
-      name: 'Kanban',
-      label: t('SIDEBAR.KANBAN'),
-      icon: 'i-lucide-columns-3',
-      to: accountScopedRoute('kanban_view'),
-      activeOn: ['kanban_view'],
-    },
     ...(isFunnelAvailable.value
       ? [
           {

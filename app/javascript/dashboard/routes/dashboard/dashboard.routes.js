@@ -9,7 +9,6 @@ import { frontendURL } from '../../helper/URLHelper';
 import helpcenterRoutes from './helpcenter/helpcenter.routes';
 import campaignsRoutes from './campaigns/campaigns.routes';
 import { routes as captainRoutes } from './captain/captain.routes';
-import { routes as kanbanRoutes } from './kanban/kanban.routes';
 import { routes as funnelRoutes } from './funnel/funnel.routes';
 import dashboardAppsRoutes from './dashboardApps/dashboardApps.routes';
 import internalChatRoutes from './internalChat/internalChat.routes';
@@ -26,7 +25,6 @@ export default {
       component: AppContainer,
       children: [
         ...captainRoutes,
-        ...kanbanRoutes,
         ...funnelRoutes,
         ...inboxRoutes,
         ...conversation.routes,
