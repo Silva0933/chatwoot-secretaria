@@ -17,6 +17,7 @@ module AccountSettingsSchema
         'hide_agent_unassigned_tab': { 'type': %w[boolean null] },
         'hide_agent_all_tab': { 'type': %w[boolean null] },
         'disable_agent_message_deletion': { 'type': %w[boolean null] },
+        'funnel_kanban_enabled': { 'type': %w[boolean null] },
         'whatsapp_native_disabled': { 'type': %w[boolean null] },
         'whatsapp_uazapi_disabled': { 'type': %w[boolean null] },
         'captain_auto_resolve_mode': { 'type': %w[string null], 'enum': ['evaluated', 'legacy', 'disabled', nil] },

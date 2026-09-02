@@ -395,6 +395,17 @@ Rails.application.routes.draw do
           end
           resources :labels, only: [:index, :show, :create, :update, :destroy]
 
+          # Modulo Funnel (Kanban). Codigo em custom/, ver config/application.rb.
+          if ChatwootApp.custom?
+            namespace :funnel do
+              resources :boards, only: [:index, :show, :create, :update, :destroy] do
+                resources :tasks, only: [:index, :show, :create, :update, :destroy] do
+                  patch :move, on: :member
+                end
+              end
+            end
+          end
+
           resources :notifications, only: [:index, :update, :destroy] do
             collection do
               post :read_all

@@ -1,0 +1,91 @@
+class Funnel::Task < ApplicationRecord
+  belongs_to :account
+  belongs_to :board, class_name: 'Funnel::Board', foreign_key: :funnel_board_id, inverse_of: :tasks
+  belongs_to :step, class_name: 'Funnel::Step', foreign_key: :funnel_step_id, inverse_of: :tasks
+  belongs_to :created_by, class_name: 'User', optional: true
+
+  has_many :task_conversations, class_name: 'Funnel::TaskConversation', foreign_key: :funnel_task_id, dependent: :destroy,
+                                inverse_of: :task
+  has_many :conversations, through: :task_conversations
+  has_many :task_contacts, class_name: 'Funnel::TaskContact', foreign_key: :funnel_task_id, dependent: :destroy, inverse_of: :task
+  has_many :contacts, through: :task_contacts
+  has_many :task_assignees, class_name: 'Funnel::TaskAssignee', foreign_key: :funnel_task_id, dependent: :destroy, inverse_of: :task
+  has_many :assignees, through: :task_assignees, source: :user
+  has_many :task_labels, class_name: 'Funnel::TaskLabel', foreign_key: :funnel_task_id, dependent: :destroy, inverse_of: :task
+  has_many :labels, through: :task_labels
+  has_many :events, -> { order(created_at: :desc) }, class_name: 'Funnel::TaskEvent', foreign_key: :funnel_task_id,
+                                                     dependent: :delete_all, inverse_of: :task
+
+  # Mesma escala de Conversation#priority, nil incluso, para que espelhar prioridade entre card
+  # e conversa na Fase 3 seja atribuicao direta e nao tabela de conversao.
+  enum priority: { low: 0, medium: 1, high: 2, urgent: 3 }
+
+  validates :title, presence: true, length: { maximum: 255 }
+  validates :rank, presence: true
+  validate :step_belongs_to_board
+  validate :board_belongs_to_account
+
+  before_validation :assign_account_from_board, on: :create
+  before_validation :assign_default_rank, on: :create
+  after_update_commit :sync_conversation_link_columns, if: :conversation_link_columns_changed?
+
+  scope :active, -> { where(archived_at: nil) }
+  scope :archived, -> { where.not(archived_at: nil) }
+  scope :in_step, ->(step_id) { where(funnel_step_id: step_id).order(:rank) }
+  scope :overdue, -> { active.where(due_at: ...Time.current) }
+  scope :assigned_to, ->(user_id) { joins(:task_assignees).where(funnel_task_assignees: { user_id: user_id }) }
+  # Escopo aplicado ao membro com visibility_scope own_tasks.
+  scope :visible_to, lambda { |user_id|
+    left_joins(:task_assignees)
+      .where('funnel_tasks.created_by_id = :id OR funnel_task_assignees.user_id = :id', id: user_id)
+      .distinct
+  }
+
+  def archived?
+    archived_at.present?
+  end
+
+  def overdue?
+    !archived? && due_at.present? && due_at < Time.current
+  end
+
+  def primary_conversation
+    task_conversations.find_by(is_primary: true)&.conversation
+  end
+
+  private
+
+  def assign_account_from_board
+    self.account_id ||= board&.account_id
+  end
+
+  def assign_default_rank
+    return if rank.present? || funnel_step_id.blank?
+
+    self.rank = Funnel::Ranking.append_after(self.class.where(funnel_step_id: funnel_step_id).maximum(:rank))
+  end
+
+  def step_belongs_to_board
+    return if step.blank? || board.blank?
+    return if step.funnel_board_id == funnel_board_id
+
+    errors.add(:step, 'must belong to the same board as the task')
+  end
+
+  def board_belongs_to_account
+    return if board.blank? || account_id.blank?
+    return if board.account_id == account_id
+
+    errors.add(:board, 'must belong to the same account as the task')
+  end
+
+  def conversation_link_columns_changed?
+    saved_change_to_archived_at? || saved_change_to_funnel_board_id?
+  end
+
+  # Mantem as copias em funnel_task_conversations coerentes com o card. Sao elas que sustentam o
+  # unique index parcial de um card ativo por conversa por quadro.
+  def sync_conversation_link_columns
+    task_conversations.update_all(active: archived_at.nil?, funnel_board_id: funnel_board_id, updated_at: Time.current)
+  end
+end
