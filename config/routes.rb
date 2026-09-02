@@ -401,6 +401,13 @@ Rails.application.routes.draw do
               resources :boards, only: [:index, :show, :create, :update, :destroy] do
                 resources :tasks, only: [:index, :show, :create, :update, :destroy] do
                   patch :move, on: :member
+                  # Conjuntos trocados por inteiro, entao resource no singular e so update.
+                  resource :assignees, only: [:update], controller: 'tasks/assignees'
+                  resource :labels, only: [:update], controller: 'tasks/labels'
+                  resource :contacts, only: [:update], controller: 'tasks/contacts'
+                  # O id aqui e o display_id da conversa, como no resto da API do core.
+                  resources :conversations, only: [:create, :update, :destroy], controller: 'tasks/conversations'
+                  resources :events, only: [:index], controller: 'tasks/events'
                 end
               end
             end

@@ -14,6 +14,16 @@ class Funnel::TaskConversation < ApplicationRecord
 
   scope :active, -> { where(active: true) }
 
+  # Rebaixa o vinculo principal do card, se houver. Fica aqui porque tanto o vinculo novo
+  # quanto a promocao de um existente precisam disso antes de marcar o seu.
+  #
+  # update_all e proposital: e uma troca de flag em massa, nenhuma validacao do modelo depende
+  # de is_primary, e o caminho por registro custaria uma query por linha.
+  def self.demote_primary_of(task)
+    where(funnel_task_id: task.id, is_primary: true)
+      .update_all(is_primary: false, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+  end
+
   private
 
   def copy_columns_from_task

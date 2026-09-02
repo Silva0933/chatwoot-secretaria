@@ -16,7 +16,10 @@ class Funnel::Tasks::LinkConversationService
     link = nil
 
     ActiveRecord::Base.transaction do
-      demote_current_primary if @primary
+      # A primeira conversa de um card e a principal mesmo sem pedir: um card com conversas e
+      # nenhuma marcada como principal nao tem o que mostrar em primeiro lugar.
+      @primary = true if @task.task_conversations.none?
+      Funnel::TaskConversation.demote_primary_of(@task) if @primary
       link = @task.task_conversations.create!(conversation: @conversation, is_primary: @primary)
       record_event
     end
@@ -28,10 +31,6 @@ class Funnel::Tasks::LinkConversationService
   end
 
   private
-
-  def demote_current_primary
-    @task.task_conversations.where(is_primary: true).update_all(is_primary: false, updated_at: Time.current)
-  end
 
   def record_event
     Funnel::TaskEvent.create!(

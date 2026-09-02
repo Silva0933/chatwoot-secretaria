@@ -1,5 +1,4 @@
-class Api::V1::Accounts::Funnel::TasksController < Api::V1::Accounts::BaseController
-  before_action :ensure_feature_enabled
+class Api::V1::Accounts::Funnel::TasksController < Api::V1::Accounts::Funnel::BaseController
   before_action :fetch_board
   before_action :fetch_task, except: [:index, :create]
   before_action :check_authorization
@@ -47,12 +46,6 @@ class Api::V1::Accounts::Funnel::TasksController < Api::V1::Accounts::BaseContro
   end
 
   private
-
-  def ensure_feature_enabled
-    return if Current.account.funnel_kanban_enabled?
-
-    render json: { error: 'Funnel Kanban is not enabled for this account' }, status: :forbidden
-  end
 
   def fetch_board
     @board = Current.account.funnel_boards.find(params[:board_id])
