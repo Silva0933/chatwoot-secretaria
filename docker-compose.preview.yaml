@@ -1,20 +1,22 @@
 # Ambiente de preview no Coolify.
 #
 # Diferente de docker-compose.coolify.yaml, que puxa ghcr.io/fazer-ai/chatwoot: aquele e a
-# imagem do upstream e nao conteria o modulo Funnel. Aqui a imagem vem do nosso proprio fork,
-# construida pelo workflow .github/workflows/preview_image.yml a cada push na branch.
+# imagem do upstream e nao conteria o modulo Funnel. Aqui o proprio servidor constroi a imagem
+# a partir do codigo da branch, entao nao existe registro no meio e nada precisa de credencial.
 #
-# A VPS nao compila nada: o build (bundle install + pnpm i + assets:precompile) roda no GitHub
-# Actions, e o servidor so faz pull. A imagem e privada, entao o daemon do servidor precisa de
-# um `docker login ghcr.io` uma unica vez.
+# rails e sidekiq compartilham a mesma tag e o mesmo bloco build de proposito: sao o mesmo
+# processo Rails com comandos diferentes, e uma tag so faz o segundo build sair inteiro do cache
+# em vez de compilar as gems nativas duas vezes.
 #
 # SERVICE_FQDN_RAILS_3000 e variavel magica do Coolify: ela faz o proxy publicar a porta 3000
 # do servico rails no dominio do recurso e devolve a URL ja com https.
 
 services:
   rails:
-    image: '${CHATWOOT_IMAGE:-ghcr.io/silva0933/chatwoot-secretaria:preview}'
-    pull_policy: always
+    image: 'secretaria-v4-preview:latest'
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     volumes:
       - 'storage:/app/storage'
     depends_on:
@@ -66,8 +68,10 @@ services:
       retries: 10
 
   sidekiq:
-    image: '${CHATWOOT_IMAGE:-ghcr.io/silva0933/chatwoot-secretaria:preview}'
-    pull_policy: always
+    image: 'secretaria-v4-preview:latest'
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     volumes:
       - 'storage:/app/storage'
     depends_on:

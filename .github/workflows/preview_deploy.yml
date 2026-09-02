@@ -1,0 +1,33 @@
+name: Preview deploy
+
+# Avisa o Coolify que a branch mudou. Quem constroi a imagem e o proprio servidor, a partir do
+# docker-compose.preview.yaml, entao aqui nao ha build nem registro no meio.
+#
+# Poderia ser o webhook de git do Coolify em vez deste job. Optamos pela API porque o segredo ja
+# esta configurado, o resultado aparece na aba Actions junto com o resto do historico da branch,
+# e um push com falha de rede fica visivel em vez de sumir.
+
+on:
+  push:
+    branches:
+      - feat/crm-kanban
+  workflow_dispatch:
+
+# Sem cancel-in-progress: um deploy ja em andamento no servidor nao deve ser abandonado pela
+# metade so porque chegou outro push. Eles entram em fila.
+concurrency:
+  group: preview-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          curl --fail-with-body -sS \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$COOLIFY_APP_UUID&force=false"
