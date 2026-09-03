@@ -411,6 +411,11 @@ Rails.application.routes.draw do
               resources :tasks, only: [:index, :show, :create, :update] do
                 post :move, on: :member
               end
+              # Enderecado pela conversa em vez do id do card: e o ponto de entrada que um agente
+              # de IA respondendo uma mensagem consegue alcancar sozinho. O id e o display_id.
+              resources :conversation_cards, only: [:show], param: :conversation_id do
+                post :move, on: :member
+              end
             end
 
             namespace :funnel do

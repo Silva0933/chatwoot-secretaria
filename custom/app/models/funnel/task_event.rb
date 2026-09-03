@@ -8,7 +8,11 @@ class Funnel::TaskEvent < ApplicationRecord
 
   validates :event_type, presence: true
 
-  SOURCES = %w[web api automation system].freeze
+  # "agent" e a IA de atendimento movendo o card por conta propria, e vale a categoria propria em
+  # vez de cair em "api": ela chama a API com o mesmo token de um administrador, entao o ator
+  # gravado nao a distingue de uma pessoa. A pergunta que alguem faz olhando um card que andou
+  # sozinho e exatamente essa, e sem o rotulo o registro nao a responde.
+  SOURCES = %w[web api automation agent system].freeze
   validates :source, inclusion: { in: SOURCES }
 
   private

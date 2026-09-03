@@ -49,6 +49,22 @@ class Funnel::Task < ApplicationRecord
       .distinct
   }
 
+  # O card que representa uma conversa. Havendo cards em quadros diferentes, vale o mais recente:
+  # o contrato da Pro carrega um card so, e o ultimo vinculo e o que descreve o atendimento em curso.
+  #
+  # Mora aqui porque duas coisas precisam concordar sobre "o card desta conversa" — o kanban_task
+  # embutido no payload da conversa e o endpoint kanban/conversation_cards. Se cada uma escolhesse
+  # sozinha, o agente leria um card e moveria outro, sem erro em lugar nenhum.
+  def self.for_conversation(conversation_id)
+    task = Funnel::TaskConversation.active
+                                   .where(conversation_id: conversation_id)
+                                   .order(created_at: :desc)
+                                   .first&.task
+    return if task.nil? || task.archived_at.present?
+
+    task
+  end
+
   def archived?
     archived_at.present?
   end
