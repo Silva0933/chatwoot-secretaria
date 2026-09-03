@@ -5,9 +5,11 @@ import { debounce } from '@chatwoot/utils';
 
 import { useMapGetter } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
+import { useUISettings } from 'dashboard/composables/useUISettings';
 import {
   SORT_OPTIONS,
   TASK_PRIORITIES,
+  DUE_FILTERS,
   EMPTY_FILTERS,
 } from 'dashboard/helper/funnelHelper';
 
@@ -24,6 +26,17 @@ const accountLabels = useMapGetter('labels/getLabels');
 const inboxes = useMapGetter('inboxes/getInboxes');
 
 const searchInput = ref(funnelStore.filters.search);
+const attributeKey = ref(funnelStore.filters.attributeKey);
+const attributeValue = ref(funnelStore.filters.attributeValue);
+const viewName = ref('');
+const showSaveView = ref(false);
+
+// Visoes salvas moram nas preferencias do usuario e nao numa tabela. Sao a combinacao de
+// filtros de quem esta olhando, nao dado do quadro: uma migration para guardar preferencia
+// pessoal seria peso a mais no schema por nada.
+const { updateUISettings, uiSettings } = useUISettings();
+
+const savedViews = computed(() => uiSettings.value?.funnel_saved_views ?? []);
 
 const filters = computed(() => funnelStore.filters);
 const hasFilters = computed(() => funnelStore.hasFilters);
@@ -61,6 +74,16 @@ const labelOptions = computed(() =>
       label: label.title,
     })),
     t('FUNNEL.FILTERS.ANY_LABEL')
+  )
+);
+
+const dueOptions = computed(() =>
+  withAnyOption(
+    DUE_FILTERS.map(value => ({
+      value,
+      label: t(`FUNNEL.FILTERS.DUE.${value.toUpperCase()}`),
+    })),
+    t('FUNNEL.FILTERS.ANY_DUE')
   )
 );
 
@@ -116,24 +139,87 @@ const activeChips = computed(() => {
       label: named(labelOptions.value, labelId) ?? String(labelId),
     });
   }
+  if (filters.value.due) {
+    chips.push({
+      key: 'due',
+      label: named(dueOptions.value, filters.value.due) ?? filters.value.due,
+    });
+  }
+  if (filters.value.attributeKey) {
+    chips.push({
+      key: 'attributeKey',
+      label: filters.value.attributeValue
+        ? `${filters.value.attributeKey}: ${filters.value.attributeValue}`
+        : filters.value.attributeKey,
+    });
+  }
 
   return chips;
 });
 
 const setFilter = (key, value) => funnelStore.setFilters({ [key]: value });
 
-const clearChip = key => setFilter(key, EMPTY_FILTERS[key]);
+// Remover o chip do atributo tem de limpar a chave e o valor: deixar o valor sozinho
+// filtraria por nada e o chip nao voltaria para dizer isso.
+const clearAttribute = () => {
+  attributeKey.value = '';
+  attributeValue.value = '';
+  funnelStore.setFilters({ attributeKey: '', attributeValue: '' });
+};
+
+const clearChip = key =>
+  key === 'attributeKey'
+    ? clearAttribute()
+    : setFilter(key, EMPTY_FILTERS[key]);
 
 const clearAll = () => {
   searchInput.value = '';
+  attributeKey.value = '';
+  attributeValue.value = '';
   funnelStore.clearFilters();
 };
+
+const pushAttribute = debounce(() => {
+  funnelStore.setFilters({
+    attributeKey: attributeKey.value,
+    attributeValue: attributeValue.value,
+  });
+}, 250);
+
+const saveView = () => {
+  const name = viewName.value.trim();
+  if (!name) return;
+
+  const views = savedViews.value.filter(view => view.name !== name);
+  updateUISettings({
+    funnel_saved_views: [
+      ...views,
+      { name, filters: { ...funnelStore.filters }, sortBy: funnelStore.sortBy },
+    ],
+  });
+  viewName.value = '';
+  showSaveView.value = false;
+};
+
+const applyView = view => {
+  searchInput.value = view.filters?.search ?? '';
+  attributeKey.value = view.filters?.attributeKey ?? '';
+  attributeValue.value = view.filters?.attributeValue ?? '';
+  funnelStore.setFilters({ ...EMPTY_FILTERS, ...view.filters });
+  funnelStore.setSortBy(view.sortBy ?? 'position');
+};
+
+const removeView = name =>
+  updateUISettings({
+    funnel_saved_views: savedViews.value.filter(view => view.name !== name),
+  });
 
 // Buscar a cada tecla refiltraria a lista inteira em cada letra; 250ms cobre a digitacao sem a
 // tela parecer travada.
 const pushSearch = debounce(value => setFilter('search', value), 250);
 
 watch(searchInput, value => pushSearch(value));
+watch([attributeKey, attributeValue], () => pushAttribute());
 
 // A busca tambem chega pela URL, entao o campo precisa acompanhar o estado e nao so alimenta-lo.
 watch(
@@ -186,6 +272,14 @@ watch(
         @update:model-value="value => setFilter('labelId', value)"
       />
 
+      <Select
+        :model-value="filters.due"
+        :options="dueOptions"
+        :aria-label="t('FUNNEL.FILTERS.ANY_DUE')"
+        class="w-36"
+        @update:model-value="value => setFilter('due', value)"
+      />
+
       <div class="flex items-center gap-1.5 ltr:ml-auto rtl:mr-auto">
         <Icon icon="i-lucide-arrow-up-down" class="size-4 text-n-slate-11" />
         <Select
@@ -196,6 +290,66 @@ watch(
           @update:model-value="value => funnelStore.setSortBy(value)"
         />
       </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <Input
+        v-model="attributeKey"
+        class="w-44"
+        :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
+        :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
+      />
+      <Input
+        v-model="attributeValue"
+        class="w-44"
+        :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
+        :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
+      />
+
+      <span
+        v-for="view in savedViews"
+        :key="view.name"
+        class="flex items-center gap-1 py-0.5 ltr:pl-2 ltr:pr-1 rtl:pr-2 rtl:pl-1 text-xs rounded-md bg-n-alpha-2 text-n-slate-12"
+      >
+        <button type="button" class="hover:underline" @click="applyView(view)">
+          {{ view.name }}
+        </button>
+        <Button
+          variant="ghost"
+          color="slate"
+          size="xs"
+          icon="i-lucide-x"
+          :aria-label="t('FUNNEL.FILTERS.REMOVE_VIEW')"
+          @click="removeView(view.name)"
+        />
+      </span>
+
+      <template v-if="showSaveView">
+        <Input
+          v-model="viewName"
+          class="w-40"
+          :placeholder="t('FUNNEL.FILTERS.VIEW_NAME')"
+          :aria-label="t('FUNNEL.FILTERS.VIEW_NAME')"
+          @keydown.enter.prevent="saveView"
+        />
+        <Button
+          variant="faded"
+          color="slate"
+          size="xs"
+          :label="t('FUNNEL.FILTERS.SAVE_VIEW')"
+          :disabled="!viewName.trim()"
+          @click="saveView"
+        />
+      </template>
+      <Button
+        v-else-if="hasFilters"
+        variant="link"
+        color="slate"
+        size="xs"
+        icon="i-lucide-bookmark"
+        :label="t('FUNNEL.FILTERS.SAVE_VIEW')"
+        @click="showSaveView = true"
+      />
     </div>
 
     <div v-if="hasFilters" class="flex flex-wrap items-center gap-2">

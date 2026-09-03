@@ -181,7 +181,19 @@
       "SHOWING": "mostrando {visible} de {total}",
       "EMPTY_TITLE": "Ninguna tarjeta coincide con estos filtros",
       "EMPTY_SUBTITLE": "Ajuste o limpie los filtros para ver las tarjetas del tablero.",
-      "DRAG_DISABLED": "Arrastrar solo está disponible al ordenar por posición."
+      "DRAG_DISABLED": "Arrastrar solo está disponible al ordenar por posición.",
+      "ANY_DUE": "Cualquier vencimiento",
+      "DUE": {
+        "OVERDUE": "Atrasadas",
+        "TODAY": "Vencen hoy",
+        "WEEK": "Próximos 7 días",
+        "NONE": "Sin vencimiento"
+      },
+      "ATTRIBUTE_KEY": "Atributo",
+      "ATTRIBUTE_VALUE": "Valor del atributo",
+      "SAVE_VIEW": "Guardar vista",
+      "VIEW_NAME": "Nombre de la vista",
+      "REMOVE_VIEW": "Quitar vista"
     },
     "SORT": {
       "LABEL": "Ordenar por",
@@ -262,6 +274,14 @@
         "SYNC_ASSIGNEES": "Mantener el mismo responsable en ambos",
         "SYNC_LABELS_AND_PRIORITY": "Mantener la misma prioridad en ambos"
       }
+    },
+    "STATES": {
+      "ERROR_TITLE": "No se pudo cargar el embudo",
+      "ERROR_SUBTITLE": "La conexión falló o el servidor no respondió. Inténtelo de nuevo.",
+      "RETRY": "Intentar de nuevo",
+      "FORBIDDEN_TITLE": "No tiene acceso a ningún tablero",
+      "FORBIDDEN_SUBTITLE": "Pida a un administrador que lo agregue como miembro de un tablero.",
+      "OFFLINE": "Sin conexión — el tablero puede estar desactualizado."
     }
   }
 }

@@ -181,7 +181,19 @@
       "SHOWING": "showing {visible} of {total}",
       "EMPTY_TITLE": "No card matches these filters",
       "EMPTY_SUBTITLE": "Adjust or clear the filters to see the cards on the board.",
-      "DRAG_DISABLED": "Dragging is available only when sorting by position."
+      "DRAG_DISABLED": "Dragging is available only when sorting by position.",
+      "ANY_DUE": "Any due date",
+      "DUE": {
+        "OVERDUE": "Overdue",
+        "TODAY": "Due today",
+        "WEEK": "Next 7 days",
+        "NONE": "No due date"
+      },
+      "ATTRIBUTE_KEY": "Attribute",
+      "ATTRIBUTE_VALUE": "Attribute value",
+      "SAVE_VIEW": "Save view",
+      "VIEW_NAME": "View name",
+      "REMOVE_VIEW": "Remove view"
     },
     "SORT": {
       "LABEL": "Sort by",
@@ -262,6 +274,14 @@
         "SYNC_ASSIGNEES": "Keep the assignee the same on both",
         "SYNC_LABELS_AND_PRIORITY": "Keep the priority the same on both"
       }
+    },
+    "STATES": {
+      "ERROR_TITLE": "Could not load the funnel",
+      "ERROR_SUBTITLE": "The connection failed or the server did not answer. Try again.",
+      "RETRY": "Try again",
+      "FORBIDDEN_TITLE": "You have access to no board",
+      "FORBIDDEN_SUBTITLE": "Ask an administrator to add you as a member of a board.",
+      "OFFLINE": "Offline — the board may be out of date."
     }
   }
 }

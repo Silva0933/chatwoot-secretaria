@@ -12,6 +12,7 @@ import { EMPTY_FILTERS, formatMoney } from 'dashboard/helper/funnelHelper';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
 import Select from 'dashboard/components-next/select/Select.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
@@ -42,6 +43,11 @@ const archiveBoardDialogRef = ref(null);
 const archiveTaskDialogRef = ref(null);
 const showBoardSwitcher = ref(false);
 const taskPendingArchive = ref(null);
+
+// Erro de carga precisa de estado proprio. Sem ele, uma falha de rede caia no mesmo "Nenhum
+// quadro por aqui" do quadro vazio — a tela afirmava que nao havia quadros quando na verdade
+// nao tinha conseguido perguntar.
+const loadError = ref(null);
 
 const isModuleEnabled = computed(() =>
   Boolean(currentAccount.value?.settings?.funnel_kanban_enabled)
@@ -162,10 +168,14 @@ const selectBoard = async boardId => {
 };
 
 const loadBoards = async () => {
+  loadError.value = null;
   try {
     await funnelStore.fetchBoards();
   } catch (error) {
-    useAlert(error.message || t('FUNNEL.API.BOARDS_ERROR'));
+    // 401 aqui e recusa da policy e nao sessao expirada: o RequestExceptionHandler do Chatwoot
+    // responde 401 para Pundit. Dizer "sem permissao" e mais util que "erro ao carregar".
+    const denied = /not authorized/i.test(error.message ?? '');
+    loadError.value = denied ? 'forbidden' : 'error';
     return;
   }
 
@@ -478,6 +488,43 @@ watch(
       >
         <Spinner />
         <span class="text-sm">{{ t('FUNNEL.LOADING') }}</span>
+      </div>
+
+      <div
+        v-else-if="loadError"
+        class="flex flex-col items-center justify-center gap-3 px-6 text-center grow"
+      >
+        <Icon
+          :icon="
+            loadError === 'forbidden' ? 'i-lucide-lock' : 'i-lucide-cloud-off'
+          "
+          class="size-8 text-n-slate-10"
+        />
+        <div class="flex flex-col gap-1">
+          <h2 class="text-lg font-medium text-n-slate-12">
+            {{
+              loadError === 'forbidden'
+                ? t('FUNNEL.STATES.FORBIDDEN_TITLE')
+                : t('FUNNEL.STATES.ERROR_TITLE')
+            }}
+          </h2>
+          <p class="max-w-md text-sm text-n-slate-11">
+            {{
+              loadError === 'forbidden'
+                ? t('FUNNEL.STATES.FORBIDDEN_SUBTITLE')
+                : t('FUNNEL.STATES.ERROR_SUBTITLE')
+            }}
+          </p>
+        </div>
+        <Button
+          v-if="loadError !== 'forbidden'"
+          variant="faded"
+          color="slate"
+          size="sm"
+          icon="i-lucide-refresh-cw"
+          :label="t('FUNNEL.STATES.RETRY')"
+          @click="loadBoards"
+        />
       </div>
 
       <div

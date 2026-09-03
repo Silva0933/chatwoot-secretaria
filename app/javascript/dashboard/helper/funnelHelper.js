@@ -6,6 +6,10 @@
  * que separam dois cards vizinhos. Toda comparacao aqui e feita sobre a string.
  */
 
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
 const parseDecimal = value => {
   const raw = String(value ?? '0').trim();
   const negative = raw.startsWith('-');
@@ -68,18 +72,100 @@ export const SORT_OPTIONS = [
   'title',
 ];
 
+// Filtro de prazo em faixas nomeadas, nao em duas datas. "Vence hoje" e "atrasado" sao as
+// perguntas que alguem faz olhando um funil; um seletor de intervalo pede duas decisoes para
+// responder a mesma coisa.
+export const DUE_FILTERS = ['overdue', 'today', 'week', 'none'];
+
 export const EMPTY_FILTERS = Object.freeze({
   search: '',
   assigneeId: null,
   inboxId: null,
   priority: null,
   labelId: null,
+  due: null,
+  attributeKey: '',
+  attributeValue: '',
 });
 
 export const hasActiveFilters = filters =>
   Object.entries(EMPTY_FILTERS).some(
     ([key, empty]) => (filters?.[key] ?? empty) !== empty
   );
+
+export const DUE_STATES = {
+  OVERDUE: 'overdue',
+  TODAY: 'today',
+  TOMORROW: 'tomorrow',
+  FUTURE: 'future',
+};
+
+/**
+ * Classifica o vencimento. A comparacao e por dia do calendario e nao por diferenca de horas:
+ * as 23h, algo que vence as 8h de amanha esta a nove horas de distancia, mas para quem le o
+ * quadro e "amanha", nao "hoje".
+ */
+export const dueState = (dueAt, now = new Date()) => {
+  if (!dueAt) return null;
+
+  const due = new Date(dueAt);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const startOfDay = date =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+  const days = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
+  if (due.getTime() < now.getTime() && days <= 0) return DUE_STATES.OVERDUE;
+  if (days <= 0) return DUE_STATES.TODAY;
+  if (days === 1) return DUE_STATES.TOMORROW;
+
+  return DUE_STATES.FUTURE;
+};
+
+// Prioridade nao pode depender so de cor: o PRD pede icone e texto por acessibilidade, e um
+// quadro cheio de bolinhas coloridas nao se le em escala de cinza nem por quem nao distingue
+// vermelho de verde.
+export const PRIORITY_META = {
+  urgent: { icon: 'i-lucide-chevrons-up', tone: 'ruby' },
+  high: { icon: 'i-lucide-chevron-up', tone: 'amber' },
+  medium: { icon: 'i-lucide-equal', tone: 'blue' },
+  low: { icon: 'i-lucide-chevron-down', tone: 'slate' },
+};
+
+const matchesDue = (task, wanted) => {
+  const state = dueState(task.dueAt);
+
+  // "Sem prazo" e um filtro por ausencia: precisa casar com o card que nao tem data, e nenhum
+  // estado descreve isso — dueState devolve null.
+  if (wanted === 'none') return state === null;
+  if (state === null) return false;
+
+  if (wanted === 'overdue') return state === DUE_STATES.OVERDUE;
+  if (wanted === 'today') return state === DUE_STATES.TODAY;
+  if (wanted === 'week') {
+    const days = (new Date(task.dueAt) - Date.now()) / (24 * 60 * 60 * 1000);
+    return state !== DUE_STATES.OVERDUE && days <= 7;
+  }
+
+  return true;
+};
+
+// Chave sozinha filtra por presenca do atributo; com valor, por valor. Comparacao por texto e
+// sem diferenciar maiuscula: o atributo e digitado pelo usuario nos dois lados.
+const matchesAttribute = (task, filters) => {
+  const key = filters.attributeKey?.trim();
+  if (!key) return true;
+
+  const attributes = task.customAttributes ?? {};
+  if (!(key in attributes)) return false;
+
+  const wanted = filters.attributeValue?.trim();
+  if (!wanted) return true;
+
+  return String(attributes[key] ?? '')
+    .toLowerCase()
+    .includes(wanted.toLowerCase());
+};
 
 const matchesSearch = (task, term) => {
   if (!term) return true;
@@ -123,6 +209,10 @@ export const filterTasks = (tasks = [], filters = EMPTY_FILTERS) =>
     ) {
       return false;
     }
+
+    if (filters.due && !matchesDue(task, filters.due)) return false;
+
+    if (!matchesAttribute(task, filters)) return false;
 
     return true;
   });
@@ -206,10 +296,6 @@ export const neighboursAt = (orderedTasks, taskId) => {
   };
 };
 
-const MINUTE = 60 * 1000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
 /**
  * Ha quanto tempo o card esta parado na etapa, no formato curto do quadro: 55m, 3h, 12d.
  *
@@ -227,45 +313,6 @@ export const timeInStep = (stepChangedAt, now = Date.now()) => {
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
 
   return `${Math.floor(elapsed / DAY)}d`;
-};
-
-export const DUE_STATES = {
-  OVERDUE: 'overdue',
-  TODAY: 'today',
-  TOMORROW: 'tomorrow',
-  FUTURE: 'future',
-};
-
-/**
- * Classifica o vencimento. A comparacao e por dia do calendario e nao por diferenca de horas:
- * as 23h, algo que vence as 8h de amanha esta a nove horas de distancia, mas para quem le o
- * quadro e "amanha", nao "hoje".
- */
-export const dueState = (dueAt, now = new Date()) => {
-  if (!dueAt) return null;
-
-  const due = new Date(dueAt);
-  if (Number.isNaN(due.getTime())) return null;
-
-  const startOfDay = date =>
-    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-
-  const days = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
-  if (due.getTime() < now.getTime() && days <= 0) return DUE_STATES.OVERDUE;
-  if (days <= 0) return DUE_STATES.TODAY;
-  if (days === 1) return DUE_STATES.TOMORROW;
-
-  return DUE_STATES.FUTURE;
-};
-
-// Prioridade nao pode depender so de cor: o PRD pede icone e texto por acessibilidade, e um
-// quadro cheio de bolinhas coloridas nao se le em escala de cinza nem por quem nao distingue
-// vermelho de verde.
-export const PRIORITY_META = {
-  urgent: { icon: 'i-lucide-chevrons-up', tone: 'ruby' },
-  high: { icon: 'i-lucide-chevron-up', tone: 'amber' },
-  medium: { icon: 'i-lucide-equal', tone: 'blue' },
-  low: { icon: 'i-lucide-chevron-down', tone: 'slate' },
 };
 
 export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'];

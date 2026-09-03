@@ -181,7 +181,19 @@
       "SHOWING": "mostrando {visible} de {total}",
       "EMPTY_TITLE": "Nenhum card com esses filtros",
       "EMPTY_SUBTITLE": "Ajuste ou limpe os filtros para ver os cards do quadro.",
-      "DRAG_DISABLED": "Arraste disponível apenas na ordenação por posição."
+      "DRAG_DISABLED": "Arraste disponível apenas na ordenação por posição.",
+      "ANY_DUE": "Qualquer prazo",
+      "DUE": {
+        "OVERDUE": "Atrasados",
+        "TODAY": "Vencem hoje",
+        "WEEK": "Próximos 7 dias",
+        "NONE": "Sem prazo"
+      },
+      "ATTRIBUTE_KEY": "Atributo",
+      "ATTRIBUTE_VALUE": "Valor do atributo",
+      "SAVE_VIEW": "Salvar visão",
+      "VIEW_NAME": "Nome da visão",
+      "REMOVE_VIEW": "Remover visão"
     },
     "SORT": {
       "LABEL": "Ordenar por",
@@ -262,6 +274,14 @@
         "SYNC_ASSIGNEES": "Manter o responsável igual nos dois",
         "SYNC_LABELS_AND_PRIORITY": "Manter a prioridade igual nos dois"
       }
+    },
+    "STATES": {
+      "ERROR_TITLE": "Não foi possível carregar o funil",
+      "ERROR_SUBTITLE": "A conexão falhou ou o servidor não respondeu. Tente de novo.",
+      "RETRY": "Tentar de novo",
+      "FORBIDDEN_TITLE": "Você não tem acesso a nenhum quadro",
+      "FORBIDDEN_SUBTITLE": "Peça a um administrador para incluir você como membro de um quadro.",
+      "OFFLINE": "Sem conexão — o quadro pode estar desatualizado."
     }
   }
 }

@@ -8,6 +8,7 @@ import {
   DUE_STATES,
   filterTasks,
   sortTasks,
+  DUE_FILTERS,
   hasActiveFilters,
   EMPTY_FILTERS,
 } from '../funnelHelper';
@@ -197,6 +198,78 @@ describe('funnelHelper', () => {
       expect(filterTasks(tasks, { inboxId: 5 }).map(t => t.id)).not.toContain(
         3
       );
+    });
+  });
+
+  describe('filtering by due date', () => {
+    const iso = days => new Date(Date.now() + days * 86400000).toISOString();
+    const tasks = [
+      { id: 1, dueAt: iso(-2) },
+      { id: 2, dueAt: iso(0.2) },
+      { id: 3, dueAt: iso(3) },
+      { id: 4, dueAt: iso(30) },
+      { id: 5, dueAt: null },
+    ];
+
+    it('offers the four ranges the board is asked about', () => {
+      expect(DUE_FILTERS).toEqual(['overdue', 'today', 'week', 'none']);
+    });
+
+    it('finds what is overdue', () => {
+      expect(filterTasks(tasks, { due: 'overdue' }).map(t => t.id)).toEqual([
+        1,
+      ]);
+    });
+
+    it('finds what is due within a week, leaving out what is already late', () => {
+      expect(filterTasks(tasks, { due: 'week' }).map(t => t.id)).toEqual([
+        2, 3,
+      ]);
+    });
+
+    // Ausencia de prazo e um filtro proprio: nenhum estado de vencimento descreve isso.
+    it('finds the cards with no due date at all', () => {
+      expect(filterTasks(tasks, { due: 'none' }).map(t => t.id)).toEqual([5]);
+    });
+  });
+
+  describe('filtering by custom attribute', () => {
+    const tasks = [
+      { id: 1, customAttributes: { plano: 'ouro', origem: 'indicacao' } },
+      { id: 2, customAttributes: { plano: 'prata' } },
+      { id: 3, customAttributes: {} },
+      { id: 4 },
+    ];
+
+    it('filters by the presence of the key when no value is given', () => {
+      expect(
+        filterTasks(tasks, { attributeKey: 'plano' }).map(t => t.id)
+      ).toEqual([1, 2]);
+    });
+
+    it('filters by value when one is given', () => {
+      expect(
+        filterTasks(tasks, {
+          attributeKey: 'plano',
+          attributeValue: 'ouro',
+        }).map(t => t.id)
+      ).toEqual([1]);
+    });
+
+    // Os dois lados sao digitados por pessoas; exigir a caixa exata daria zero resultado a toa.
+    it('ignores letter case in the value', () => {
+      expect(
+        filterTasks(tasks, {
+          attributeKey: 'plano',
+          attributeValue: 'OURO',
+        }).map(t => t.id)
+      ).toEqual([1]);
+    });
+
+    it('survives a card with no attributes at all', () => {
+      expect(
+        filterTasks(tasks, { attributeKey: 'plano' }).map(t => t.id)
+      ).not.toContain(4);
     });
   });
 
