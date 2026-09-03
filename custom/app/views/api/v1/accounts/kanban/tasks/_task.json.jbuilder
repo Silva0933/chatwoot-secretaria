@@ -10,9 +10,9 @@ json.priority task.priority
 # O agente mostra "status" ao modelo como o estado do card. O que temos de mais proximo e o tipo
 # da etapa onde ele esta: open, won ou lost.
 json.status task.step.stage_type
-# Valor monetario ainda nao existe no modulo (relatorio 4.7). Vai null em vez de zero: zero
-# afirmaria que a oportunidade vale nada, null diz que nao sabemos.
-json.value nil
+# Null em vez de zero quando o card nao tem valor: zero afirmaria que a oportunidade vale nada,
+# null diz que nao sabemos. O agente le exatamente essa diferenca (numOrNull no cliente dele).
+json.value task.value
 json.start_date task.start_at
 json.due_date task.due_at
 json.custom_attributes task.custom_attributes

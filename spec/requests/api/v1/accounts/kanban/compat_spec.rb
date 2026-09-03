@@ -35,6 +35,26 @@ RSpec.describe 'Kanban compatibility API', type: :request do
       expect(response.parsed_body['board']).to include('id' => board.id, 'name' => 'Pipeline')
     end
 
+    # O agente le value para saber quanto vale a oportunidade. Enquanto o modulo nao tinha valor
+    # monetario isto saia fixo em null, e ficou assim depois que passou a ter — o agente lia
+    # "nao sabemos" de um card com valor preenchido.
+    it 'reports the monetary value of the card' do
+      task = create(:funnel_task, board_for_task: board, step: step, value: 1250.5)
+
+      get "#{base}/tasks/#{task.id}", headers: headers, as: :json
+
+      expect(response.parsed_body['value'].to_f).to eq(1250.5)
+    end
+
+    # Zero afirmaria que a oportunidade nao vale nada; sem valor preenchido a resposta e null.
+    it 'reports no value as null and not as zero' do
+      task = create(:funnel_task, board_for_task: board, step: step)
+
+      get "#{base}/tasks/#{task.id}", headers: headers, as: :json
+
+      expect(response.parsed_body['value']).to be_nil
+    end
+
     it 'reports the stage type as the status of the card' do
       task = create(:funnel_task, board_for_task: board, step: lost_step)
 
