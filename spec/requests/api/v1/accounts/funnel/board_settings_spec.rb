@@ -88,6 +88,50 @@ RSpec.describe 'Funnel Board Settings API', type: :request do
     end
   end
 
+  # As automacoes sao o que faz o quadro reagir sozinho, e nao havia teste nenhum sobre gravar
+  # esses interruptores. Sem isso, um quadro sem automacao nenhuma parece configurado.
+  describe 'PATCH automation_settings' do
+    it 'stores the switches that were turned on' do
+      patch board_path,
+            params: { board: { automation_settings: { 'create_task_on_conversation' => true,
+                                                      'resolve_conversation_on_final_step' => true } } },
+            headers: headers, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(board.reload.automation_settings).to include(
+        'create_task_on_conversation' => true,
+        'resolve_conversation_on_final_step' => true
+      )
+    end
+
+    it 'answers with the switches so the screen can render what was saved' do
+      patch board_path,
+            params: { board: { automation_settings: { 'create_task_on_conversation' => true } } },
+            headers: headers, as: :json
+
+      expect(response.parsed_body.dig('payload', 'automation_settings') ||
+             response.parsed_body['automation_settings']).to include('create_task_on_conversation' => true)
+    end
+
+    # Nome que nao e uma regra conhecida nao pode entrar: o motor ignoraria, e o quadro ficaria
+    # afirmando na tela uma automacao que nunca roda.
+    it 'drops a switch that is not a known rule' do
+      patch board_path,
+            params: { board: { automation_settings: { 'drop_database' => true } } },
+            headers: headers, as: :json
+
+      expect(board.reload.automation_settings).not_to have_key('drop_database')
+    end
+
+    it 'keeps the switches when another field of the board is edited' do
+      board.update!(automation_settings: { 'create_task_on_conversation' => true })
+
+      patch board_path, params: { board: { name: 'Outro nome' } }, headers: headers, as: :json
+
+      expect(board.reload.automation_settings).to include('create_task_on_conversation' => true)
+    end
+  end
+
   describe 'the weighted pipeline' do
     it 'carries the currency of the board and the probability of each stage' do
       board.update!(currency: 'EUR')

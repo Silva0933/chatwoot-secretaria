@@ -22,8 +22,6 @@ const props = defineProps({
   board: { type: Object, default: null },
 });
 
-const emit = defineEmits(['saveBoard']);
-
 const { t } = useI18n();
 const funnelStore = useFunnelStore();
 
@@ -94,35 +92,57 @@ watch(memberIds, ids => {
   });
 });
 
-watch(() => props.board, syncFromBoard, { immediate: true, deep: true });
+// So sincroniza com o quadro enquanto o dialogo esta fechado. Cada uma das tres gravacoes abaixo
+// devolve o quadro inteiro e mexe no store, o que dispara este watch: sem a trava, a resposta da
+// primeira reescrevia o formulario com o estado que o servidor ainda tinha, e a gravacao seguinte
+// mandava de volta aquilo — apagando as caixas que a pessoa acabara de escolher.
+const isOpen = ref(false);
+
+watch(
+  () => props.board,
+  () => {
+    if (!isOpen.value) syncFromBoard();
+  },
+  { immediate: true, deep: true }
+);
 
 const open = () => {
   syncFromBoard();
+  isOpen.value = true;
   dialogRef.value?.open();
 };
 
-const close = () => dialogRef.value?.close();
+const close = () => {
+  isOpen.value = false;
+  dialogRef.value?.close();
+};
 
 const save = async () => {
-  if (!form.name.trim()) return;
+  const name = form.name.trim();
+  if (!name) return;
+
+  // Tudo lido antes do primeiro await. Ler o formulario entre uma gravacao e outra leria o que o
+  // servidor devolveu, nao o que a pessoa escolheu.
+  const board = {
+    id: props.board.id,
+    name,
+    description: form.description.trim() || null,
+    currency: form.currency.trim().toUpperCase(),
+    automationSettings: { ...automations },
+  };
+  const members = memberIds.value.map(id => ({
+    user_id: id,
+    role: roles[id]?.role ?? 'member',
+    visibility_scope: roles[id]?.visibilityScope ?? 'all_tasks',
+  }));
+  const boardInboxIds = [...inboxIds.value];
 
   try {
-    emit('saveBoard', {
-      id: props.board.id,
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-      currency: form.currency.trim().toUpperCase(),
-      automationSettings: { ...automations },
-    });
-
-    await funnelStore.replaceBoardMembers({
-      members: memberIds.value.map(id => ({
-        user_id: id,
-        role: roles[id]?.role ?? 'member',
-        visibility_scope: roles[id]?.visibilityScope ?? 'all_tasks',
-      })),
-    });
-    await funnelStore.replaceBoardInboxes({ inboxIds: inboxIds.value });
+    // Em sequencia e tudo aguardado. Antes o quadro ia por emit, que nao da para aguardar, e as
+    // tres requisicoes corriam juntas — cada uma respondendo com uma versao diferente do quadro.
+    await funnelStore.replaceBoardMembers({ members });
+    await funnelStore.replaceBoardInboxes({ inboxIds: boardInboxIds });
+    await funnelStore.updateBoard(board);
 
     useAlert(t('FUNNEL.SETTINGS.SAVED'));
     close();

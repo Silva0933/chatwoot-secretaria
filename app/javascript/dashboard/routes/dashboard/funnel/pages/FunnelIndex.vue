@@ -206,14 +206,6 @@ const onCreateBoard = async payload => {
   }
 };
 
-const onSaveBoard = async payload => {
-  try {
-    await funnelStore.updateBoard(payload);
-  } catch (error) {
-    useAlert(error.message);
-  }
-};
-
 const onArchiveBoard = async () => {
   const boardId = activeBoard.value?.id;
   if (!boardId) return;
@@ -595,11 +587,9 @@ watch(
       @archive="onRequestArchiveTask"
     />
 
-    <BoardSettingsDialog
-      ref="boardSettingsRef"
-      :board="activeBoard"
-      @save-board="onSaveBoard"
-    />
+    <!-- O dialogo grava sozinho: as tres chamadas precisam ser em sequencia, e um emit nao da
+         para aguardar. -->
+    <BoardSettingsDialog ref="boardSettingsRef" :board="activeBoard" />
 
     <StepDialog
       ref="stepDialogRef"
