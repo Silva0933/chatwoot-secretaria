@@ -423,6 +423,7 @@ Rails.application.routes.draw do
                 resources :steps, only: [:create, :update, :destroy] do
                   patch :reorder, on: :collection
                 end
+                resource :report, only: [:show]
                 resource :members, only: [:update]
                 resource :inboxes, only: [:update]
                 resources :tasks, only: [:index, :show, :create, :update, :destroy] do

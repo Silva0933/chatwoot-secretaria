@@ -2,14 +2,13 @@ require 'rails_helper'
 
 RSpec.describe 'Funnel Tasks API', type: :request do
   let!(:account) { create(:account) }
+  let(:tasks_path) { "/api/v1/accounts/#{account.id}/funnel/boards/#{board.id}/tasks" }
   let!(:board) { create(:funnel_board, account: account) }
   let!(:step) { create(:funnel_step, board: board) }
   let!(:administrator) { create(:user, account: account, role: :administrator) }
   let!(:agent) { create(:user, account: account, role: :agent) }
 
   before { account.update!(funnel_kanban_enabled: true) }
-
-  let(:tasks_path) { "/api/v1/accounts/#{account.id}/funnel/boards/#{board.id}/tasks" }
 
   describe 'GET index' do
     it 'returns unauthorized without authentication' do
@@ -85,7 +84,7 @@ RSpec.describe 'Funnel Tasks API', type: :request do
     it 'creates a card and records who created it' do
       expect do
         post tasks_path, params: { task: { title: 'Primeira consulta', funnel_step_id: step.id } },
-                   headers: administrator.create_new_auth_token, as: :json
+                         headers: administrator.create_new_auth_token, as: :json
       end.to change(Funnel::Task, :count).by(1)
 
       expect(response).to have_http_status(:success)
@@ -94,7 +93,7 @@ RSpec.describe 'Funnel Tasks API', type: :request do
 
     it 'falls back to the entry step when none is given' do
       post tasks_path, params: { task: { title: 'Sem etapa' } },
-                 headers: administrator.create_new_auth_token, as: :json
+                       headers: administrator.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:success)
       expect(Funnel::Task.last.funnel_step_id).to eq(board.entry_step.id)
@@ -102,7 +101,7 @@ RSpec.describe 'Funnel Tasks API', type: :request do
 
     it 'forbids an agent who is not a member of the board' do
       post tasks_path, params: { task: { title: 'Nao permitido' } },
-                 headers: agent.create_new_auth_token, as: :json
+                       headers: agent.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:unauthorized)
     end
@@ -114,7 +113,7 @@ RSpec.describe 'Funnel Tasks API', type: :request do
 
     it 'moves the card to the given step' do
       patch "#{tasks_path}/#{task.id}/move", params: { step_id: target_step.id },
-                                      headers: administrator.create_new_auth_token, as: :json
+                                             headers: administrator.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:success)
       expect(task.reload.funnel_step_id).to eq(target_step.id)
@@ -124,7 +123,7 @@ RSpec.describe 'Funnel Tasks API', type: :request do
       foreign_step = create(:funnel_step, board: create(:funnel_board, account: account))
 
       patch "#{tasks_path}/#{task.id}/move", params: { step_id: foreign_step.id },
-                                      headers: administrator.create_new_auth_token, as: :json
+                                             headers: administrator.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:not_found)
     end
@@ -138,7 +137,7 @@ RSpec.describe 'Funnel Tasks API', type: :request do
       task.update!(title: 'Alterado por outro agente')
 
       patch "#{tasks_path}/#{task.id}", params: { task: { title: 'Minha alteracao', lock_version: stale_version } },
-                                 headers: administrator.create_new_auth_token, as: :json
+                                        headers: administrator.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:conflict)
     end

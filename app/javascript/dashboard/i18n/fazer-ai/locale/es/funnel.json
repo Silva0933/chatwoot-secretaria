@@ -220,6 +220,36 @@
       "CONFIGURE": "Configurar tablero",
       "PIPELINE_VALUE": "valor ponderado",
       "REORDER_HINT": "Arrastre el encabezado para reordenar las etapas."
+    },
+    "REPORT": {
+      "TITLE": "Informe del embudo",
+      "PERIOD": "Período",
+      "LAST_DAYS": "Últimos {days} días",
+      "EXPORT": "Exportar CSV",
+      "PICK_BOARD": "Elija un tablero para ver el informe.",
+      "BY_STAGE": "Tarjetas por etapa",
+      "BY_STAGE_LEGEND": "tarjetas · edad mediana · detenidas",
+      "STAGE_TOOLTIP": "{count} tarjetas, {stalled} detenidas",
+      "CLOSURES": "Cierres a lo largo del tiempo",
+      "NO_CLOSURES": "Nada se cerró en el período.",
+      "CONVERSION": "Conversión entre etapas",
+      "NO_CONVERSION": "Ninguna tarjeta cambió de etapa en el período.",
+      "AGENTS": "Ranking de agentes",
+      "AGENT": "Agente",
+      "NO_AGENTS": "Ninguna tarjeta tiene responsable.",
+      "WON": "Ganados",
+      "LOST": "Perdidos",
+      "OPEN": "Abiertos",
+      "STALLED": "Tarjetas detenidas",
+      "DAYS": "hace {days} días",
+      "TILES": {
+        "CREATED": "Creados",
+        "WON": "Ganados",
+        "LOST": "Perdidos",
+        "WIN_RATE": "Tasa de éxito",
+        "OPEN_VALUE": "Abierto",
+        "WEIGHTED_VALUE": "Ponderado"
+      }
     }
   }
 }

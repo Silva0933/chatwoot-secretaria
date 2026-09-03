@@ -220,6 +220,36 @@
       "CONFIGURE": "Configurar quadro",
       "PIPELINE_VALUE": "valor ponderado",
       "REORDER_HINT": "Arraste o cabeçalho para reordenar as etapas."
+    },
+    "REPORT": {
+      "TITLE": "Relatório do funil",
+      "PERIOD": "Período",
+      "LAST_DAYS": "Últimos {days} dias",
+      "EXPORT": "Exportar CSV",
+      "PICK_BOARD": "Escolha um quadro para ver o relatório.",
+      "BY_STAGE": "Cards por etapa",
+      "BY_STAGE_LEGEND": "cards · idade mediana · parados",
+      "STAGE_TOOLTIP": "{count} cards, {stalled} parados",
+      "CLOSURES": "Fechamentos ao longo do tempo",
+      "NO_CLOSURES": "Nenhum fechamento no período.",
+      "CONVERSION": "Conversão entre etapas",
+      "NO_CONVERSION": "Nenhum card mudou de etapa no período.",
+      "AGENTS": "Ranking de agentes",
+      "AGENT": "Agente",
+      "NO_AGENTS": "Nenhum card com responsável.",
+      "WON": "Ganhos",
+      "LOST": "Perdidos",
+      "OPEN": "Abertos",
+      "STALLED": "Cards parados",
+      "DAYS": "há {days} dias",
+      "TILES": {
+        "CREATED": "Criados",
+        "WON": "Ganhos",
+        "LOST": "Perdidos",
+        "WIN_RATE": "Taxa de ganho",
+        "OPEN_VALUE": "Em aberto",
+        "WEIGHTED_VALUE": "Ponderado"
+      }
     }
   }
 }

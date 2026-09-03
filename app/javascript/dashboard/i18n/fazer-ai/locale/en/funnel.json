@@ -220,6 +220,36 @@
       "CONFIGURE": "Configure board",
       "PIPELINE_VALUE": "weighted value",
       "REORDER_HINT": "Drag the header to reorder the stages."
+    },
+    "REPORT": {
+      "TITLE": "Funnel report",
+      "PERIOD": "Period",
+      "LAST_DAYS": "Last {days} days",
+      "EXPORT": "Export CSV",
+      "PICK_BOARD": "Pick a board to see the report.",
+      "BY_STAGE": "Cards per stage",
+      "BY_STAGE_LEGEND": "cards · median age · stalled",
+      "STAGE_TOOLTIP": "{count} cards, {stalled} stalled",
+      "CLOSURES": "Closures over time",
+      "NO_CLOSURES": "Nothing closed in the period.",
+      "CONVERSION": "Stage conversion",
+      "NO_CONVERSION": "No card changed stage in the period.",
+      "AGENTS": "Agent ranking",
+      "AGENT": "Agent",
+      "NO_AGENTS": "No card has an assignee.",
+      "WON": "Won",
+      "LOST": "Lost",
+      "OPEN": "Open",
+      "STALLED": "Stalled cards",
+      "DAYS": "{days} days ago",
+      "TILES": {
+        "CREATED": "Created",
+        "WON": "Won",
+        "LOST": "Lost",
+        "WIN_RATE": "Win rate",
+        "OPEN_VALUE": "Open",
+        "WEIGHTED_VALUE": "Weighted"
+      }
     }
   }
 }

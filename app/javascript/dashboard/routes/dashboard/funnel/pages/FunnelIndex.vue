@@ -323,6 +323,13 @@ const onDeleteStep = async () => {
   }
 };
 
+const openReport = () =>
+  router.push({
+    name: 'funnel_report',
+    params: route.params,
+    query: { board: String(activeBoard.value.id) },
+  });
+
 const openTaskDialog = task => taskDialogRef.value?.open({ task });
 
 const openNewTaskDialog = (step = null) =>
@@ -427,6 +434,15 @@ watch(
           >
             {{ pipelineValueLabel }}
           </span>
+          <Button
+            v-if="activeBoard"
+            variant="ghost"
+            color="slate"
+            size="sm"
+            icon="i-lucide-chart-no-axes-column"
+            :aria-label="t('FUNNEL.REPORT.TITLE')"
+            @click="openReport"
+          />
           <Button
             v-if="activeBoard && canManageSettings"
             variant="ghost"

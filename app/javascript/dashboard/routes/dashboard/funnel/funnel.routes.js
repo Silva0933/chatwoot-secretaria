@@ -1,5 +1,6 @@
 import { frontendURL } from '../../../helper/URLHelper';
 import FunnelIndex from './pages/FunnelIndex.vue';
+import FunnelReport from './pages/FunnelReport.vue';
 
 // Sem featureFlag no meta: o modulo e ligado por account.settings.funnel_kanban_enabled, nao
 // por feature_flags. A propria pagina cuida do estado desligado, e a API recusa por conta.
@@ -16,6 +17,12 @@ export const routes = [
     path: frontendURL('accounts/:accountId/funnel'),
     component: FunnelIndex,
     name: 'funnel_view',
+    meta,
+  },
+  {
+    path: frontendURL('accounts/:accountId/funnel/report'),
+    component: FunnelReport,
+    name: 'funnel_report',
     meta,
   },
 ];

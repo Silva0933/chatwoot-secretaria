@@ -3,6 +3,7 @@ import snakecaseKeys from 'snakecase-keys';
 import { defineStore } from 'pinia';
 import FunnelBoardsApi from 'dashboard/api/funnel/boards';
 import FunnelConversationTasksApi from 'dashboard/api/funnel/conversationTasks';
+import FunnelReportsApi from 'dashboard/api/funnel/reports';
 import FunnelStepsApi from 'dashboard/api/funnel/steps';
 import FunnelTasksApi from 'dashboard/api/funnel/tasks';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
@@ -26,6 +27,7 @@ const createUIFlags = () => ({
   savingStep: false,
   savingBoardSettings: false,
   fetchingConversationTasks: false,
+  fetchingReport: false,
   fetchingEvents: false,
 });
 
@@ -47,6 +49,7 @@ export const useFunnelStore = defineStore('funnel', {
     activeBoardId: null,
     taskEvents: [],
     conversationTasks: [],
+    report: null,
     filters: { ...EMPTY_FILTERS },
     sortBy: 'position',
     uiFlags: createUIFlags(),
@@ -588,11 +591,31 @@ export const useFunnelStore = defineStore('funnel', {
       this.boards[index] = { ...this.boards[index], ...payload };
     },
 
+    async fetchReport({
+      boardId = this.activeBoardId,
+      since = null,
+      until = null,
+    } = {}) {
+      if (!boardId) return null;
+
+      this.setUIFlag({ fetchingReport: true });
+      try {
+        const { data } = await FunnelReportsApi.get(boardId, { since, until });
+        this.report = camelize(data.payload ?? data);
+        return this.report;
+      } catch (error) {
+        return throwErrorMessage(error);
+      } finally {
+        this.setUIFlag({ fetchingReport: false });
+      }
+    },
+
     reset() {
       this.boards = [];
       this.tasks = [];
       this.taskEvents = [];
       this.conversationTasks = [];
+      this.report = null;
       this.filters = { ...EMPTY_FILTERS };
       this.sortBy = 'position';
       this.activeBoardId = null;
