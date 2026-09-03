@@ -10,6 +10,13 @@ class Funnel::Board < ApplicationRecord
   validates :name, presence: true, length: { maximum: 255 }
   validates :currency, format: { with: /\A[A-Z]{3}\z/ }
 
+  has_many :automation_runs, class_name: 'Funnel::AutomationRun', foreign_key: :funnel_board_id,
+                             dependent: :delete_all, inverse_of: :board
+
+  def automation_enabled?(rule)
+    ActiveModel::Type::Boolean.new.cast(automation_settings[rule]).present?
+  end
+
   scope :active, -> { where(archived_at: nil) }
 
   after_commit :dispatch_updated, on: [:create, :update]

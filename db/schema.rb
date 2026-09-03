@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_09_02_200000) do
+ActiveRecord::Schema[7.1].define(version: 2026_09_02_210000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1130,6 +1130,22 @@ ActiveRecord::Schema[7.1].define(version: 2026_09_02_200000) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "funnel_automation_runs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "funnel_board_id", null: false
+    t.bigint "funnel_task_id"
+    t.bigint "conversation_id"
+    t.string "rule", null: false
+    t.string "event_name", null: false
+    t.string "status", default: "ok", null: false
+    t.jsonb "data", default: {}, null: false
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.index ["account_id", "created_at"], name: "idx_funnel_automation_runs_on_account_created"
+    t.index ["funnel_board_id", "rule"], name: "idx_funnel_automation_runs_on_board_rule"
+    t.index ["funnel_task_id"], name: "idx_funnel_automation_runs_on_task"
+  end
+
   create_table "funnel_board_inboxes", force: :cascade do |t|
     t.bigint "funnel_board_id", null: false
     t.bigint "inbox_id", null: false
@@ -1161,6 +1177,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_09_02_200000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "currency", limit: 3, default: "BRL", null: false
+    t.jsonb "automation_settings", default: {}, null: false
     t.index ["account_id", "archived_at"], name: "index_funnel_boards_on_account_id_and_archived_at"
     t.index ["account_id"], name: "index_funnel_boards_on_account_id"
   end
@@ -2004,6 +2021,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_09_02_200000) do
   add_foreign_key "campaign_recipients", "campaigns", on_delete: :cascade
   add_foreign_key "campaign_recipients", "contacts", on_delete: :cascade
   add_foreign_key "campaign_recipients", "inboxes", on_delete: :cascade
+  add_foreign_key "funnel_automation_runs", "accounts", on_delete: :cascade
+  add_foreign_key "funnel_automation_runs", "funnel_boards", on_delete: :cascade
   add_foreign_key "funnel_board_inboxes", "funnel_boards", on_delete: :cascade
   add_foreign_key "funnel_board_inboxes", "inboxes", on_delete: :cascade
   add_foreign_key "funnel_board_members", "funnel_boards", on_delete: :cascade

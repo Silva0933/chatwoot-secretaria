@@ -250,6 +250,18 @@
         "OPEN_VALUE": "Abierto",
         "WEIGHTED_VALUE": "Ponderado"
       }
+    },
+    "AUTOMATIONS": {
+      "TITLE": "Automatizaciones",
+      "HINT": "Se aplican a las bandejas vinculadas arriba. Cada ejecución queda registrada.",
+      "RULES": {
+        "CREATE_TASK_ON_CONVERSATION": "Crear tarjeta automáticamente para una conversación nueva",
+        "AUTO_ASSIGN_TASK": "Asignar la tarjeta a quien atiende la conversación",
+        "WIN_TASK_ON_CONVERSATION_RESOLVED": "Mover la tarjeta a Ganado al resolver la conversación",
+        "RESOLVE_CONVERSATION_ON_FINAL_STEP": "Resolver la conversación cuando la tarjeta cierra",
+        "SYNC_ASSIGNEES": "Mantener el mismo responsable en ambos",
+        "SYNC_LABELS_AND_PRIORITY": "Mantener la misma prioridad en ambos"
+      }
     }
   }
 }

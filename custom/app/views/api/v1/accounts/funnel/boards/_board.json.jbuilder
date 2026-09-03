@@ -2,6 +2,7 @@ json.id board.id
 json.name board.name
 json.description board.description
 json.currency board.currency
+json.automation_settings board.automation_settings
 json.archived_at board.archived_at
 json.created_at board.created_at
 json.steps board.steps.map do |step|

@@ -6,6 +6,7 @@ import { useAlert } from 'dashboard/composables';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
 import {
+  AUTOMATION_RULES,
   BOARD_MEMBER_ROLES,
   VISIBILITY_SCOPES,
 } from 'dashboard/helper/funnelHelper';
@@ -34,6 +35,7 @@ const form = reactive({ name: '', description: '', currency: 'BRL' });
 const memberIds = ref([]);
 const inboxIds = ref([]);
 const roles = reactive({});
+const automations = reactive({});
 
 const isSaving = computed(() => funnelStore.getUIFlags.savingBoardSettings);
 
@@ -72,6 +74,10 @@ const syncFromBoard = () => {
   memberIds.value = (board.members ?? []).map(member => member.userId);
   inboxIds.value = board.inboxIds ?? [];
 
+  AUTOMATION_RULES.forEach(rule => {
+    automations[rule] = Boolean(board.automationSettings?.[rule]);
+  });
+
   (board.members ?? []).forEach(member => {
     roles[member.userId] = {
       role: member.role,
@@ -106,6 +112,7 @@ const save = async () => {
       name: form.name.trim(),
       description: form.description.trim() || null,
       currency: form.currency.trim().toUpperCase(),
+      automationSettings: { ...automations },
     });
 
     await funnelStore.replaceBoardMembers({
@@ -202,6 +209,30 @@ defineExpose({ open, close });
             />
           </li>
         </ul>
+      </section>
+
+      <section class="flex flex-col gap-2">
+        <span class="text-sm font-medium text-n-slate-12">
+          {{ t('FUNNEL.AUTOMATIONS.TITLE') }}
+        </span>
+        <p class="text-xs text-n-slate-10">
+          {{ t('FUNNEL.AUTOMATIONS.HINT') }}
+        </p>
+        <label
+          v-for="rule in AUTOMATION_RULES"
+          :key="rule"
+          class="flex items-start gap-2 text-sm cursor-pointer text-n-slate-12"
+        >
+          <input
+            v-model="automations[rule]"
+            type="checkbox"
+            class="mt-1 accent-n-brand"
+            :disabled="isSaving"
+          />
+          <span class="flex flex-col">
+            {{ t(`FUNNEL.AUTOMATIONS.RULES.${rule.toUpperCase()}`) }}
+          </span>
+        </label>
       </section>
 
       <section class="flex flex-col gap-2">

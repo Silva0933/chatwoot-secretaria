@@ -162,11 +162,18 @@ export const useFunnelStore = defineStore('funnel', {
       }
     },
 
-    async updateBoard({ id, name, description }) {
+    async updateBoard({ id, name, description, currency, automationSettings }) {
       this.setUIFlag({ updatingBoard: true });
       try {
         const { data } = await FunnelBoardsApi.update(id, {
-          board: { name, description },
+          board: {
+            name,
+            description,
+            ...(currency ? { currency } : {}),
+            ...(automationSettings
+              ? { automation_settings: automationSettings }
+              : {}),
+          },
         });
         const board = camelize(data.payload ?? data);
         this.upsertBoard(board);

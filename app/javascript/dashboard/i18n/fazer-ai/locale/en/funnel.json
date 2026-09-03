@@ -250,6 +250,18 @@
         "OPEN_VALUE": "Open",
         "WEIGHTED_VALUE": "Weighted"
       }
+    },
+    "AUTOMATIONS": {
+      "TITLE": "Automations",
+      "HINT": "They apply to the inboxes linked above. Every run is recorded.",
+      "RULES": {
+        "CREATE_TASK_ON_CONVERSATION": "Create a card automatically for a new conversation",
+        "AUTO_ASSIGN_TASK": "Assign the card to whoever handles the conversation",
+        "WIN_TASK_ON_CONVERSATION_RESOLVED": "Move the card to Won when the conversation is resolved",
+        "RESOLVE_CONVERSATION_ON_FINAL_STEP": "Resolve the conversation when the card closes",
+        "SYNC_ASSIGNEES": "Keep the assignee the same on both",
+        "SYNC_LABELS_AND_PRIORITY": "Keep the priority the same on both"
+      }
     }
   }
 }

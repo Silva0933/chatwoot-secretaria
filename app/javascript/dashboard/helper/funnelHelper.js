@@ -278,6 +278,17 @@ export const BOARD_MEMBER_ROLES = ['manager', 'member', 'viewer'];
 
 export const VISIBILITY_SCOPES = ['all_tasks', 'own_tasks'];
 
+// Mesma ordem e mesmos nomes de Funnel::Automations::Runner::RULES. Um nome divergente aqui
+// grava uma chave que o motor nunca le, e a automacao fica ligada na tela sem nunca rodar.
+export const AUTOMATION_RULES = [
+  'create_task_on_conversation',
+  'auto_assign_task',
+  'win_task_on_conversation_resolved',
+  'resolve_conversation_on_final_step',
+  'sync_assignees',
+  'sync_labels_and_priority',
+];
+
 /**
  * Valor formatado na moeda do quadro. Cai para o codigo cru quando a moeda nao e reconhecida
  * pelo navegador: mostrar "XYZ 1.500" informa mais do que estourar ou esconder o numero.
