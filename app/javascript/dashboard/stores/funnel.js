@@ -1,4 +1,3 @@
-import camelcaseKeys from 'camelcase-keys';
 import snakecaseKeys from 'snakecase-keys';
 import { defineStore } from 'pinia';
 import FunnelBoardsApi from 'dashboard/api/funnel/boards';
@@ -12,6 +11,7 @@ import {
   groupTasksByStep,
   filterTasks,
   hasActiveFilters,
+  camelizeFunnelPayload,
   EMPTY_FILTERS,
 } from 'dashboard/helper/funnelHelper';
 
@@ -31,9 +31,7 @@ const createUIFlags = () => ({
   fetchingEvents: false,
 });
 
-// stopPaths em custom_attributes: as chaves ali sao do cliente, camelizar renomearia dado dele.
-const camelize = data =>
-  camelcaseKeys(data ?? {}, { deep: true, stopPaths: ['custom_attributes'] });
+const camelize = camelizeFunnelPayload;
 
 const buildTaskPayload = ({ customAttributes, ...rest } = {}) => ({
   task: {

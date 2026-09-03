@@ -1,4 +1,5 @@
 import {
+  camelizeFunnelPayload,
   compareRank,
   sortByRank,
   groupTasksByStep,
@@ -332,5 +333,51 @@ describe('funnelHelper', () => {
         beforeId: null,
       });
     });
+  });
+});
+
+describe('camelizeFunnelPayload', () => {
+  // O bug que este teste existe para impedir: a tela mostrava todas as automacoes desligadas
+  // enquanto o servidor respondia 200 com elas ligadas. camelize renomeava a CHAVE da regra.
+  it('keeps the automation rule names exactly as the backend stores them', () => {
+    const board = camelizeFunnelPayload({
+      board_step_id: 3,
+      automation_settings: { create_task_on_conversation: true },
+    });
+
+    expect(board.boardStepId).toBe(3);
+    expect(board.automationSettings).toEqual({
+      create_task_on_conversation: true,
+    });
+  });
+
+  it('keeps the custom attribute names the customer chose', () => {
+    const task = camelizeFunnelPayload({
+      custom_attributes: { estagio_do_lead: 'novo', plano_do_paciente: 'ouro' },
+    });
+
+    expect(task.customAttributes).toEqual({
+      estagio_do_lead: 'novo',
+      plano_do_paciente: 'ouro',
+    });
+  });
+
+  // A listagem chega como array, e e por ali que a tela carrega o quadro no primeiro acesso.
+  it('protects the same dictionaries inside a list', () => {
+    const [board] = camelizeFunnelPayload([
+      {
+        inbox_ids: [1],
+        automation_settings: { resolve_conversation_on_final_step: true },
+      },
+    ]);
+
+    expect(board.inboxIds).toEqual([1]);
+    expect(board.automationSettings).toEqual({
+      resolve_conversation_on_final_step: true,
+    });
+  });
+
+  it('survives a null payload', () => {
+    expect(camelizeFunnelPayload(null)).toEqual({});
   });
 });

@@ -6,9 +6,28 @@
  * que separam dois cards vizinhos. Toda comparacao aqui e feita sobre a string.
  */
 
+import camelcaseKeys from 'camelcase-keys';
+
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+
+/**
+ * Dicionarios de chave livre no payload do Funnel. A chave ali e DADO — o nome de uma regra de
+ * automacao, o nome de um atributo que o cliente inventou — e nao nome de campo da API, entao
+ * camelizar renomeia informacao. `create_task_on_conversation` virava `createTaskOnConversation`
+ * e sumia para quem procurasse pelo nome real, que e o que o backend guarda e o que a tela usa.
+ *
+ * Mora aqui, e nao no store, para caber num teste: o sintoma e uma tela que mostra tudo
+ * desligado enquanto o servidor responde 200 com tudo ligado, e nada nesse caminho quebra alto.
+ */
+export const FREE_FORM_DICTIONARIES = [
+  'custom_attributes',
+  'automation_settings',
+];
+
+export const camelizeFunnelPayload = data =>
+  camelcaseKeys(data ?? {}, { deep: true, stopPaths: FREE_FORM_DICTIONARIES });
 
 const parseDecimal = value => {
   const raw = String(value ?? '0').trim();
