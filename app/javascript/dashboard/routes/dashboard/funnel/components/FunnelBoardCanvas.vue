@@ -19,6 +19,7 @@ const emit = defineEmits([
   'move',
   'addCard',
   'openTask',
+  'openConversation',
   'configureStep',
   'addStep',
 ]);
@@ -90,6 +91,7 @@ const onColumnChange = ({ stepId, event }) => {
           @change="onColumnChange"
           @add-card="$emit('addCard', $event)"
           @open-task="$emit('openTask', $event)"
+          @open-conversation="$emit('openConversation', $event)"
           @configure="$emit('configureStep', $event)"
         />
       </template>

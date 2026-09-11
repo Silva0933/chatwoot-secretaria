@@ -9,6 +9,7 @@ import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
 import { EMPTY_FILTERS, formatMoney } from 'dashboard/helper/funnelHelper';
+import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -28,7 +29,7 @@ const route = useRoute();
 const router = useRouter();
 const funnelStore = useFunnelStore();
 const store = useStore();
-const { currentAccount } = useAccount();
+const { currentAccount, accountId } = useAccount();
 
 const currentRole = useMapGetter('getCurrentRole');
 
@@ -334,6 +335,19 @@ const openReport = () =>
 
 const openTaskDialog = task => taskDialogRef.value?.open({ task });
 
+// Abre a conversa na caixa de entrada dela, como TaskAssociations ja faz: e la que estao o
+// editor e o historico, e nao numa aba do card.
+const goToConversation = conversation =>
+  router.push(
+    frontendURL(
+      conversationUrl({
+        accountId: accountId.value,
+        activeInbox: conversation.inboxId,
+        id: conversation.id,
+      })
+    )
+  );
+
 const openNewTaskDialog = (step = null) =>
   taskDialogRef.value?.open({ step: step ?? steps.value[0] ?? null });
 
@@ -565,6 +579,7 @@ watch(
         @move="onMoveTask"
         @add-card="openNewTaskDialog"
         @open-task="openTaskDialog"
+        @open-conversation="goToConversation"
         @configure-step="stepDialogRef?.open($event)"
         @reorder-steps="onReorderSteps"
         @add-step="stepDialogRef?.open()"

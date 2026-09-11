@@ -16,7 +16,7 @@ const props = defineProps({
   task: { type: Object, required: true },
 });
 
-defineEmits(['open']);
+const emit = defineEmits(['open', 'openConversation']);
 
 const { t, locale } = useI18n();
 
@@ -67,6 +67,15 @@ const hiddenAssigneeLabel = computed(
 );
 
 const conversations = computed(() => props.task.conversations ?? []);
+
+// A conversa que o card abre: a principal, ou a primeira quando nenhuma foi promovida.
+const primaryConversation = computed(
+  () =>
+    conversations.value.find(conversation => conversation.isPrimary) ??
+    conversations.value[0] ??
+    null
+);
+
 const contact = computed(() => (props.task.contacts ?? [])[0] ?? null);
 
 // O ChannelIcon do core resolve o glifo a partir de channel_type, provider e medium — os tres
@@ -111,22 +120,40 @@ const due = computed(() => {
 });
 
 const summary = computed(() => props.task.description?.trim() || '');
+
+// O corpo do card leva para a conversa, que e o que o agente quer na maioria das vezes; as
+// opcoes do card ficam na engrenagem. Sem conversa vinculada nao ha para onde navegar, entao
+// ali o corpo volta a abrir o card.
+const activate = () => {
+  if (primaryConversation.value) {
+    emit('openConversation', primaryConversation.value);
+    return;
+  }
+
+  emit('open', props.task);
+};
+
+const openLabel = computed(() =>
+  primaryConversation.value
+    ? t('FUNNEL.CARD.OPEN_CONVERSATION')
+    : t('FUNNEL.CARD.OPEN')
+);
 </script>
 
 <template>
   <div
-    class="flex flex-col gap-2 p-3 border rounded-lg cursor-pointer select-none bg-n-solid-1 border-n-weak hover:border-n-slate-6"
+    class="flex flex-col gap-2 p-3 border rounded-lg cursor-pointer select-none group bg-n-solid-1 border-n-weak hover:border-n-slate-6"
     role="button"
     tabindex="0"
-    :aria-label="t('FUNNEL.CARD.OPEN')"
-    @click="$emit('open', task)"
-    @keydown.enter.prevent="$emit('open', task)"
-    @keydown.space.prevent="$emit('open', task)"
+    :aria-label="openLabel"
+    @click="activate"
+    @keydown.enter.prevent="activate"
+    @keydown.space.prevent="activate"
   >
     <!-- 1. titulo, com o responsavel a direita, como na referencia -->
-    <div class="flex items-start justify-between gap-2">
+    <div class="flex items-start gap-2">
       <span
-        class="text-sm font-semibold break-words text-n-slate-12 line-clamp-2"
+        class="text-sm font-semibold break-words grow text-n-slate-12 line-clamp-2"
       >
         {{ title }}
       </span>
@@ -150,6 +177,18 @@ const summary = computed(() => props.task.description?.trim() || '');
           {{ hiddenAssigneeLabel }}
         </span>
       </div>
+
+      <!-- Engrenagem: abre o card. O stop impede que o clique e as teclas cheguem ao corpo,
+           que navega para a conversa. -->
+      <button
+        type="button"
+        class="p-1 transition-opacity rounded opacity-0 shrink-0 text-n-slate-11 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-n-alpha-2"
+        :aria-label="t('FUNNEL.CARD.CONFIGURE')"
+        @click.stop="$emit('open', task)"
+        @keydown.stop
+      >
+        <Icon icon="i-lucide-settings" class="size-3.5" />
+      </button>
     </div>
 
     <!-- 2. resumo -->

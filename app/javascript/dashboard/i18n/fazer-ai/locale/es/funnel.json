@@ -35,7 +35,9 @@
       "NO_TITLE": "Sin título",
       "TODAY": "Hoy",
       "TOMORROW": "Mañana",
-      "TIME_IN_STEP": "Tiempo en esta etapa"
+      "TIME_IN_STEP": "Tiempo en esta etapa",
+      "OPEN_CONVERSATION": "Abrir conversación",
+      "CONFIGURE": "Editar tarjeta"
     },
     "PRIORITY": {
       "LABEL": "Prioridad",

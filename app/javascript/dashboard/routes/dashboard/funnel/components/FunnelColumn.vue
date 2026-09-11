@@ -15,7 +15,13 @@ const props = defineProps({
   canDrag: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(['change', 'addCard', 'openTask', 'configure']);
+const emit = defineEmits([
+  'change',
+  'addCard',
+  'openTask',
+  'openConversation',
+  'configure',
+]);
 
 const { t } = useI18n();
 
@@ -105,7 +111,11 @@ const onChange = event => emit('change', { stepId: props.step.id, event });
       @change="onChange"
     >
       <template #item="{ element }">
-        <FunnelCard :task="element" @open="$emit('openTask', element)" />
+        <FunnelCard
+          :task="element"
+          @open="$emit('openTask', element)"
+          @open-conversation="$emit('openConversation', $event)"
+        />
       </template>
       <template #footer>
         <p
