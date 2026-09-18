@@ -1,10 +1,11 @@
 name: Run Chatwoot CE spec
 permissions:
   contents: read
+# O gatilho por tag saiu: este job pede runners Blacksmith, que este fork nao contratou, e
+# por isso ficava eternamente na fila a cada release. Quem cobre este fork e o funnel_spec.yml,
+# em runner publico. Mantido no disparo manual para nao divergir do upstream na proxima
+# sincronizacao.
 on:
-  push:
-    tags:
-      - '*'
   workflow_dispatch:
 
 jobs:
