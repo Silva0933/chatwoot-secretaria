@@ -1,8 +1,17 @@
+# Producao no Coolify.
+#
+# A imagem e a NOSSA, publicada por .github/workflows/publish_github_docker.yml: a do upstream
+# (ghcr.io/fazer-ai/chatwoot) nao contem custom/, entao rodaria este deploy sem o modulo Funnel e
+# sem o adaptador /kanban que o fazer.ai agents chama.
+#
+# CHATWOOT_TAG fixa a versao pelo painel, sem editar este arquivo. O default latest existe para o
+# primeiro deploy; assim que houver release, prenda a tag (v1.0.0) — latest em producao apaga a
+# resposta para "qual versao esta no ar".
 version: '3'
 
 services:
   rails:
-    image: 'ghcr.io/fazer-ai/chatwoot:latest'
+    image: 'ghcr.io/silva0933/chatwoot-secretaria:${CHATWOOT_TAG:-latest}'
     pull_policy: always
     volumes:
       - 'storage:/app/storage'
@@ -56,7 +65,7 @@ services:
       retries: 10
 
   sidekiq:
-    image: 'ghcr.io/fazer-ai/chatwoot:latest'
+    image: 'ghcr.io/silva0933/chatwoot-secretaria:${CHATWOOT_TAG:-latest}'
     pull_policy: always
     volumes:
       - 'storage:/app/storage'
