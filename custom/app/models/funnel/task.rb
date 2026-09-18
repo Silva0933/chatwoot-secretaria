@@ -84,6 +84,33 @@ class Funnel::Task < ApplicationRecord
     scalar_event_data.merge(step_event_data).merge(association_event_data)
   end
 
+  # O mesmo card que kanban/tasks/_task.json.jbuilder desenha, no contrato da fazer.ai Pro, para
+  # viajar tambem no payload de evento da conversa. Um spec compara as chaves dos dois: nomes
+  # divergentes dariam ao agente um card pela API e outro pelo webhook, sem erro em lugar nenhum.
+  #
+  # value sai como string, e nao como BigDecimal: o payload vira argumento de job, e a checagem de
+  # argumentos estritos do Sidekiq recusa decimal. Do outro lado nao muda nada — o jbuilder ja
+  # serializa BigDecimal como string.
+  def kanban_event_data
+    {
+      id: id,
+      board_id: funnel_board_id,
+      board_step_id: funnel_step_id,
+      title: title,
+      description: description,
+      priority: priority,
+      status: step.stage_type,
+      value: value&.to_s,
+      start_date: start_at,
+      due_date: due_at,
+      custom_attributes: custom_attributes,
+      labels: labels.map(&:title),
+      created_at: created_at,
+      updated_at: updated_at,
+      board: { id: board.id, name: board.name }
+    }
+  end
+
   private
 
   def scalar_event_data

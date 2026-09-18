@@ -8,6 +8,16 @@ class Funnel::TaskConversation < ApplicationRecord
   # depende do unique index parcial para barrar duplicata.
   before_save :copy_columns_from_task
 
+  # Vincular ou desvincular um card muda o payload de evento da conversa, e quem consome esse
+  # payload so o recebe quando a conversa dispara evento. Sem este re-disparo, um card criado por
+  # um atendente so alcanca o agente na proxima mensagem do cliente — e um follow-up proativo,
+  # que nao e disparado por mensagem nenhuma, nunca o veria.
+  #
+  # Mover o card entre etapas ou editar seus campos NAO re-dispara, de proposito: e o que a
+  # fazer.ai Pro faz, e o cliente do agente esta escrito contra esse comportamento. Para essas
+  # mudancas ele le o card ao vivo pela API, no preparo do turno.
+  after_commit :dispatch_conversation_updated, on: [:create, :destroy]
+
   validates :conversation_id, uniqueness: { scope: :funnel_task_id }
   validate :conversation_belongs_to_task_account
   validate :single_active_task_per_board, on: :create
@@ -29,6 +39,14 @@ class Funnel::TaskConversation < ApplicationRecord
   def copy_columns_from_task
     self.funnel_board_id = task.funnel_board_id
     self.active = task.archived_at.nil?
+  end
+
+  # Conversa destruida leva os vinculos junto (dependent: :destroy). Anunciar atualizacao de uma
+  # conversa que acabou de sumir manda o consumidor buscar o que nao existe mais.
+  def dispatch_conversation_updated
+    return if conversation.blank? || conversation.destroyed?
+
+    conversation.dispatch_conversation_updated_event
   end
 
   def conversation_belongs_to_task_account

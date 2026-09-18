@@ -233,6 +233,57 @@ RSpec.describe 'Kanban compatibility API', type: :request do
     end
   end
 
+  # A outra metade da porta: o agente tambem le o card do payload que chega pelo Agent Bot, e
+  # e de la que sai o espelho dos custom_attributes que ele consulta no turno seguinte.
+  describe 'the agent bot payload' do
+    let!(:conversation) { create(:conversation, account: account) }
+    let!(:task) { create(:funnel_task, board_for_task: board, step: step, title: 'Do webhook', value: 990.0) }
+
+    before { Funnel::Tasks::LinkConversationService.new(task: task, conversation: conversation).perform }
+
+    it 'carries the card under kanban_task with the same fields the REST payload renders' do
+      get "#{base}/tasks/#{task.id}", headers: headers, as: :json
+
+      event_card = conversation.reload.webhook_data[:kanban_task]
+
+      expect(event_card[:title]).to eq('Do webhook')
+      expect(event_card.keys.map(&:to_s).sort).to eq(response.parsed_body.keys.sort)
+    end
+
+    it 'carries the custom attributes the agent writes on the card' do
+      task.update!(custom_attributes: { 'orcamento' => 'enviado' })
+
+      expect(conversation.reload.webhook_data[:kanban_task][:custom_attributes]).to eq('orcamento' => 'enviado')
+    end
+
+    it 'sends kanban_task as null when the conversation has no card' do
+      other = create(:conversation, account: account)
+
+      expect(other.webhook_data).to have_key(:kanban_task)
+      expect(other.webhook_data[:kanban_task]).to be_nil
+    end
+
+    it 'leaves the card out when the account does not have the module' do
+      account.update!(funnel_kanban_enabled: false)
+
+      expect(conversation.reload.webhook_data[:kanban_task]).to be_nil
+    end
+
+    # CONTACT_PUSH_KEYS e uma allowlist, e o card nao esta nela: nome do quadro, nome das etapas e
+    # valor da oportunidade sao contexto de atendente e nao podem chegar ao navegador do cliente.
+    it 'does not send the card to the contact' do
+      expect(conversation.reload.contact_push_event_data).not_to have_key(:kanban_task)
+    end
+
+    # message_created e message_updated aninham a conversa sob `conversation`, e e por esses dois
+    # que o agente e acordado na maior parte dos turnos.
+    it 'nests the card under the conversation on a message payload' do
+      message = create(:message, conversation: conversation, account: account)
+
+      expect(message.webhook_data[:conversation][:kanban_task]).to include(id: task.id)
+    end
+  end
+
   describe 'authorization' do
     it 'returns forbidden when the account does not have the feature' do
       account.update!(funnel_kanban_enabled: false)
