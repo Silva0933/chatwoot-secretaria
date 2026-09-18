@@ -3,15 +3,15 @@ require 'rails_helper'
 RSpec.describe Funnel::Ranking do
   describe '.between' do
     it 'returns the midpoint of both neighbours' do
-      expect(described_class.between(BigDecimal('10'), BigDecimal('20'))).to eq(BigDecimal('15'))
+      expect(described_class.between(BigDecimal(10), BigDecimal(20))).to eq(BigDecimal(15))
     end
 
     it 'appends after the last card when there is no next neighbour' do
-      expect(described_class.between(BigDecimal('10'), nil)).to eq(BigDecimal('10') + described_class::STEP)
+      expect(described_class.between(BigDecimal(10), nil)).to eq(BigDecimal(10) + described_class::STEP)
     end
 
     it 'prepends before the first card when there is no previous neighbour' do
-      expect(described_class.between(nil, BigDecimal('10'))).to eq(BigDecimal('10') - described_class::STEP)
+      expect(described_class.between(nil, BigDecimal(10))).to eq(BigDecimal(10) - described_class::STEP)
     end
 
     it 'returns the base step for an empty column' do
@@ -19,8 +19,8 @@ RSpec.describe Funnel::Ranking do
     end
 
     it 'keeps the new rank strictly between the neighbours' do
-      previous = BigDecimal('1')
-      following = BigDecimal('2')
+      previous = BigDecimal(1)
+      following = BigDecimal(2)
 
       rank = described_class.between(previous, following)
 
@@ -31,25 +31,25 @@ RSpec.describe Funnel::Ranking do
 
   describe '.rebalance_needed?' do
     it 'is false for neighbours that are far apart' do
-      expect(described_class.rebalance_needed?(BigDecimal('1'), BigDecimal('2'))).to be false
+      expect(described_class.rebalance_needed?(BigDecimal(1), BigDecimal(2))).to be false
     end
 
     it 'is true once the gap no longer fits another midpoint safely' do
-      previous = BigDecimal('1')
+      previous = BigDecimal(1)
       following = previous + (described_class::MIN_GAP / 2)
 
       expect(described_class.rebalance_needed?(previous, following)).to be true
     end
 
     it 'is false when a neighbour is missing' do
-      expect(described_class.rebalance_needed?(nil, BigDecimal('1'))).to be false
+      expect(described_class.rebalance_needed?(nil, BigDecimal(1))).to be false
     end
 
     # Este e o caso que justifica o rebalanceamento existir: inserir sempre no mesmo intervalo
     # divide o gap pela metade a cada vez, e decimal(30,15) esgota antes de 60 insercoes.
     it 'signals a rebalance before the column runs out of precision' do
-      previous = BigDecimal('0')
-      following = BigDecimal('1')
+      previous = BigDecimal(0)
+      following = BigDecimal(1)
       insertions = 0
 
       until described_class.rebalance_needed?(previous, following)

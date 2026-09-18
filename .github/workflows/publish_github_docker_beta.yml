@@ -9,9 +9,6 @@ on:
     types: [prereleased]
   workflow_dispatch:
 
-env:
-  GITHUB_REPO: ghcr.io/${{ github.repository }}
-
 jobs:
   build:
     strategy:
@@ -35,6 +32,8 @@ jobs:
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+          # ghcr.io recusa maiuscula no nome do repositorio, e o dono deste fork tem maiuscula.
+          echo "IMAGE_REPO=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Strip enterprise code
         run: |
@@ -79,8 +78,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
           tags: |
-            ${{ env.GITHUB_REPO }}:${{ env.SANITIZED_REF }}
-            ${{ env.GITHUB_REPO }}:beta
+            ${{ env.IMAGE_REPO }}:${{ env.SANITIZED_REF }}
+            ${{ env.IMAGE_REPO }}:beta
 
       - name: Export digest
         run: |
@@ -123,17 +122,18 @@ jobs:
         env:
           GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
+          IMAGE_REPO="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
           docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository }}:${SANITIZED_REF} \
-            -t ghcr.io/${{ github.repository }}:beta \
-            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+            -t ${IMAGE_REPO}:${SANITIZED_REF} \
+            -t ${IMAGE_REPO}:beta \
+            $(printf "${IMAGE_REPO}@sha256:%s " *)
 
       - name: Inspect image
         env:
           GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
+          IMAGE_REPO="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
-          REPO="ghcr.io/${{ github.repository }}"
-          docker buildx imagetools inspect ${REPO}:${SANITIZED_REF}
-          docker buildx imagetools inspect ${REPO}:beta
+          docker buildx imagetools inspect ${IMAGE_REPO}:${SANITIZED_REF}
+          docker buildx imagetools inspect ${IMAGE_REPO}:beta

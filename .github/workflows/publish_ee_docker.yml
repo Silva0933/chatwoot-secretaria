@@ -6,13 +6,11 @@
 
 name: Publish Chatwoot EE docker images
 
+# Desligado neste fork: publica em chatwoot/chatwoot no Docker Hub, que nao e nosso namespace, e
+# sem os segredos do upstream o job so falha a cada tag v*. A nossa imagem sai do
+# publish_github_docker.yml. Mantido no disparo manual para nao divergir do upstream na proxima
+# sincronizacao do fork.
 on:
-  push:
-    branches:
-      - develop
-      - master
-    tags:
-      - v*
   workflow_dispatch:
 
 env:

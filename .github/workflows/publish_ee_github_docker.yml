@@ -4,9 +4,9 @@ permissions:
   contents: read
   packages: write
 
+# Desligado neste fork: docker/Dockerfile remove enterprise/ antes do build, entao este job
+# publicaria uma imagem chamada "ee" sem codigo enterprise nenhum. Ver publish_github_docker.yml.
 on:
-  release:
-    types: [released]
   workflow_dispatch:
 
 env:
