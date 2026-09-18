@@ -1,0 +1,110 @@
+name: Funnel spec
+
+# A suite completa do upstream (run_foss_spec.yml) nao serve aqui por dois motivos: roda em
+# runners Blacksmith, que este fork nao contratou, e so dispara em tag ou disparo manual — e o
+# disparo manual exige o workflow indexado no branch padrao, o que nunca aconteceu com os
+# arquivos herdados do upstream.
+#
+# Este job dispara no push, em runner publico, e cobre o modulo Funnel, o adaptador /kanban e o
+# payload de evento da conversa: e o que muda neste fork e o que o fazer.ai agents consome.
+
+on:
+  push:
+    paths:
+      - 'custom/**'
+      - 'app/presenters/**'
+      - 'app/models/conversation.rb'
+      - 'app/views/api/v1/conversations/**'
+      - 'config/routes.rb'
+      - 'config/application.rb'
+      - 'lib/chatwoot_app.rb'
+      - 'db/migrate/**'
+      - 'db/schema.rb'
+      - 'spec/models/funnel/**'
+      - 'spec/services/funnel/**'
+      - 'spec/requests/api/v1/accounts/funnel/**'
+      - 'spec/requests/api/v1/accounts/kanban/**'
+      - 'spec/listeners/funnel_*'
+      - 'spec/factories/funnel.rb'
+      - '.github/workflows/funnel_spec.yml'
+  workflow_dispatch:
+
+# Um push novo na mesma branch torna o anterior irrelevante.
+concurrency:
+  group: funnel-spec-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  funnel-spec:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ''
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: --entrypoint redis-server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install pnpm dependencies
+        run: pnpm i
+
+      # Mesma amputacao que docker/Dockerfile faz na imagem: sem enterprise/, ChatwootApp.extensions
+      # devolve so 'custom', que e a configuracao em que este fork roda em producao.
+      - name: Strip enterprise code
+        run: |
+          rm -rf enterprise
+          rm -rf spec/enterprise
+
+      - name: Lint the module
+        run: bundle exec rubocop --force-exclusion custom spec/models/funnel spec/services/funnel spec/requests/api/v1/accounts/funnel spec/requests/api/v1/accounts/kanban spec/listeners/funnel_automation_listener_spec.rb spec/listeners/funnel_listener_spec.rb
+
+      - name: Create database
+        run: bundle exec rake db:create
+
+      - name: Load schema
+        run: bundle exec rake db:schema:load
+
+      - name: Run the Funnel specs
+        run: |
+          bundle exec rspec --format progress \
+            spec/models/funnel \
+            spec/services/funnel \
+            spec/requests/api/v1/accounts/funnel \
+            spec/requests/api/v1/accounts/kanban \
+            spec/listeners/funnel_listener_spec.rb \
+            spec/listeners/funnel_automation_listener_spec.rb \
+            spec/lib/chatwoot_app_spec.rb
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
