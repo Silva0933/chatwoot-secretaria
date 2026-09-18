@@ -241,6 +241,24 @@ RSpec.describe ImportLegacyKanbanIntoFunnel do
       expect(Funnel::Task.count).to eq(0)
     end
 
+    # Converter o quadro e deixar o modulo desligado entregaria um funil que nao aparece no menu e
+    # cuja API responde 403 — nem o operador nem o agente alcancariam o que foi importado.
+    it 'turns the module on for the account that had a funnel' do
+      expect(account.reload.funnel_kanban_enabled?).to be false
+
+      run_migration
+
+      expect(account.reload.funnel_kanban_enabled?).to be true
+    end
+
+    it 'leaves other accounts alone' do
+      outsider = create(:account)
+
+      run_migration
+
+      expect(outsider.reload.funnel_kanban_enabled?).to be false
+    end
+
     it 'archives a board whose pipeline was no longer active' do
       connection.execute("UPDATE kanban_pipelines SET is_active = FALSE WHERE id = #{fixture[:pipeline_id]}")
 

@@ -29,6 +29,7 @@ class ImportLegacyKanbanIntoFunnel < ActiveRecord::Migration[7.1]
 
       board_id = insert_board(pipeline)
       insert_tasks(pipeline['id'], board_id, insert_steps(pipeline['id'], board_id))
+      enable_module_for(pipeline['account_id'])
     end
   end
 
@@ -59,6 +60,18 @@ class ImportLegacyKanbanIntoFunnel < ActiveRecord::Migration[7.1]
     select_value(
       "SELECT 1 FROM funnel_boards WHERE settings->>'#{LEGACY_KEY}' = #{quote(pipeline_id.to_s)} LIMIT 1"
     ).present?
+  end
+
+  # O modulo e opt-in por conta, e a conta que tinha um funil na versao anterior evidentemente o
+  # usa. Sem isto o deploy converte o quadro e ele nao aparece em lugar nenhum: o menu some, a API
+  # responde 403, e nem o operador nem o agente alcancam o que acabou de ser importado. A flag so e
+  # ligada para quem tinha pipeline; nenhuma outra conta e tocada.
+  def enable_module_for(account_id)
+    execute(<<~SQL.squish)
+      UPDATE accounts
+      SET settings = jsonb_set(COALESCE(settings, '{}'::jsonb), '{funnel_kanban_enabled}', 'true'::jsonb)
+      WHERE id = #{number(account_id)}
+    SQL
   end
 
   # Pipeline inativo vira quadro arquivado: e o que as duas bases chamam de "sumiu da tela sem
