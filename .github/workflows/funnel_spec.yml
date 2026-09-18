@@ -26,6 +26,7 @@ on:
       - 'spec/requests/api/v1/accounts/kanban/**'
       - 'spec/listeners/funnel_*'
       - 'spec/factories/funnel.rb'
+      - 'spec/migrations/**'
       - '.github/workflows/funnel_spec.yml'
   workflow_dispatch:
 
@@ -88,7 +89,7 @@ jobs:
           rm -rf spec/enterprise
 
       - name: Lint the module
-        run: bundle exec rubocop --force-exclusion custom spec/models/funnel spec/services/funnel spec/requests/api/v1/accounts/funnel spec/requests/api/v1/accounts/kanban spec/listeners/funnel_automation_listener_spec.rb spec/listeners/funnel_listener_spec.rb
+        run: bundle exec rubocop --force-exclusion custom spec/migrations spec/models/funnel spec/services/funnel spec/requests/api/v1/accounts/funnel spec/requests/api/v1/accounts/kanban spec/listeners/funnel_automation_listener_spec.rb spec/listeners/funnel_listener_spec.rb
 
       - name: Create database
         run: bundle exec rake db:create
@@ -99,6 +100,7 @@ jobs:
       - name: Run the Funnel specs
         run: |
           bundle exec rspec --format progress \
+            spec/migrations \
             spec/models/funnel \
             spec/services/funnel \
             spec/requests/api/v1/accounts/funnel \
