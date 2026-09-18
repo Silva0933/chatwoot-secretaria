@@ -1,0 +1,289 @@
+{
+  "FUNNEL": {
+    "HEADER": "Embudo",
+    "LOADING": "Cargando el tablero...",
+    "DISABLED": {
+      "TITLE": "El Embudo no está activo en esta cuenta",
+      "SUBTITLE": "Pida al administrador de la instancia que habilite el módulo Embudo para esta cuenta."
+    },
+    "BOARD": {
+      "SWITCH": "Cambiar de tablero",
+      "NEW": "Nuevo tablero",
+      "ARCHIVE": "Archivar tablero",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "¿Archivar {name}?",
+        "DESCRIPTION": "El tablero sale de la lista y sus tarjetas dejan de aparecer. El historial de atención se conserva.",
+        "CONFIRM": "Archivar",
+        "CANCEL": "Cancelar"
+      },
+      "TOTAL": "tarjetas en el tablero"
+    },
+    "EMPTY_STATE": {
+      "TITLE": "Aún no hay tableros",
+      "SUBTITLE": "Cree el primer tablero para seguir a sus pacientes por etapa.",
+      "ACTION": "Crear tablero"
+    },
+    "COLUMN": {
+      "ADD_CARD": "Agregar tarjeta",
+      "EMPTY": "No hay tarjetas en esta etapa"
+    },
+    "CARD": {
+      "OVERDUE": "Atrasada",
+      "DUE": "Vence el {date}",
+      "CONVERSATIONS": "{count} conversación | {count} conversaciones",
+      "OPEN": "Abrir tarjeta",
+      "NO_TITLE": "Sin título",
+      "TODAY": "Hoy",
+      "TOMORROW": "Mañana",
+      "TIME_IN_STEP": "Tiempo en esta etapa",
+      "OPEN_CONVERSATION": "Abrir conversación",
+      "CONFIGURE": "Editar tarjeta"
+    },
+    "PRIORITY": {
+      "LABEL": "Prioridad",
+      "NONE": "Sin prioridad",
+      "LOW": "Baja",
+      "MEDIUM": "Media",
+      "HIGH": "Alta",
+      "URGENT": "Urgente"
+    },
+    "STAGE_TYPE": {
+      "OPEN": "En curso",
+      "WON": "Ganado",
+      "LOST": "Perdido"
+    },
+    "TASK": {
+      "CREATE_TITLE": "Nueva tarjeta",
+      "EDIT_TITLE": "Editar tarjeta",
+      "TITLE_LABEL": "Título",
+      "TITLE_PLACEHOLDER": "Ej.: Seguimiento de María",
+      "TITLE_REQUIRED": "Indique un título para la tarjeta",
+      "DESCRIPTION_LABEL": "Descripción",
+      "DESCRIPTION_PLACEHOLDER": "Detalles que el equipo necesita saber",
+      "STEP_LABEL": "Etapa",
+      "DUE_AT_LABEL": "Fecha límite",
+      "CREATE": "Crear tarjeta",
+      "SAVE": "Guardar",
+      "CANCEL": "Cancelar",
+      "ARCHIVE": "Archivar tarjeta",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "¿Archivar esta tarjeta?",
+        "DESCRIPTION": "Sale del tablero, pero permanece en el historial.",
+        "CONFIRM": "Archivar",
+        "CANCEL": "Cancelar"
+      },
+      "ASSIGNEES": "Responsables",
+      "LABELS": "Etiquetas",
+      "CONTACTS": "Contactos",
+      "VALUE_LABEL": "Valor",
+      "ATTRIBUTES": "Atributos personalizados",
+      "ATTRIBUTE_KEY": "Clave",
+      "ATTRIBUTE_VALUE": "Valor",
+      "ATTRIBUTE_ADD": "Agregar atributo",
+      "ATTRIBUTE_REMOVE": "Quitar atributo"
+    },
+    "BOARD_DIALOG": {
+      "TITLE": "Nuevo tablero",
+      "NAME_LABEL": "Nombre",
+      "NAME_PLACEHOLDER": "Ej.: Recorrido del paciente",
+      "NAME_REQUIRED": "Indique un nombre para el tablero",
+      "DESCRIPTION_LABEL": "Descripción",
+      "DESCRIPTION_PLACEHOLDER": "Para qué sirve este tablero",
+      "TEMPLATE_LABEL": "Etapas iniciales",
+      "TEMPLATE": {
+        "CLINIC": "Clínica (8 etapas)",
+        "BLANK": "Simple (3 etapas)"
+      },
+      "CREATE": "Crear tablero",
+      "CANCEL": "Cancelar"
+    },
+    "API": {
+      "BOARDS_ERROR": "No se pudieron cargar los tableros.",
+      "TASKS_ERROR": "No se pudieron cargar las tarjetas.",
+      "BOARD_CREATED": "Tablero creado.",
+      "BOARD_ARCHIVED": "Tablero archivado.",
+      "TASK_CREATED": "Tarjeta creada.",
+      "TASK_UPDATED": "Tarjeta actualizada.",
+      "TASK_ARCHIVED": "Tarjeta archivada.",
+      "MOVE_ERROR": "No se pudo mover la tarjeta. El tablero se recargó."
+    },
+    "ASSOCIATIONS": {
+      "ASSIGNEES_PLACEHOLDER": "Elija los responsables",
+      "LABELS_PLACEHOLDER": "Elija las etiquetas",
+      "SEARCH": "Buscar...",
+      "SEARCHING": "Buscando...",
+      "NO_AGENTS": "No se encontró ningún agente",
+      "NO_LABELS": "No se encontró ninguna etiqueta",
+      "CONTACT_PLACEHOLDER": "Busque un contacto por nombre, correo o teléfono",
+      "REMOVE_CONTACT": "Quitar contacto",
+      "CONVERSATIONS": "Conversaciones",
+      "NO_CONVERSATIONS": "Ninguna conversación vinculada a esta tarjeta",
+      "CONVERSATION_PLACEHOLDER": "Número de la conversación",
+      "LINK": "Vincular",
+      "UNLINK": "Desvincular",
+      "PRIMARY": "Principal",
+      "MAKE_PRIMARY": "Marcar como principal",
+      "AFTER_CREATE": "Responsables, etiquetas, contactos y conversaciones estarán disponibles después de crear la tarjeta."
+    },
+    "ACTIVITY": {
+      "TITLE": "Historial",
+      "EMPTY": "Todavía no ha pasado nada con esta tarjeta.",
+      "SYSTEM": "Sistema",
+      "TYPES": {
+        "MOVED": "Tarjeta movida de etapa",
+        "ASSIGNEES_REPLACED": "Responsables modificados",
+        "LABELS_REPLACED": "Etiquetas modificadas",
+        "CONTACTS_REPLACED": "Contactos modificados",
+        "CONVERSATION_LINKED": "Conversación vinculada",
+        "CONVERSATION_PROMOTED": "Conversación principal modificada",
+        "CONVERSATION_UNLINKED": "Conversación desvinculada"
+      }
+    },
+    "STEP": {
+      "CONFIGURE": "Configurar etapa",
+      "NEW": "Nueva etapa",
+      "EDIT": "Editar etapa",
+      "NAME_LABEL": "Nombre",
+      "NAME_PLACEHOLDER": "Ej.: Esperando examen",
+      "COLOR_LABEL": "Color",
+      "TYPE_LABEL": "Tipo de etapa",
+      "TYPE_HINT": "Ganado y Perdido cierran la tarjeta; En curso la mantiene en el embudo.",
+      "SAVE": "Guardar",
+      "CREATE": "Crear etapa",
+      "CANCEL": "Cancelar",
+      "DELETE": "Eliminar etapa",
+      "DELETE_CONFIRM_TITLE": "¿Eliminar la etapa {name}?",
+      "DELETE_CONFIRM_EMPTY": "La etapa está vacía y puede eliminarse con seguridad.",
+      "DELETE_CONFIRM_MOVE": "Esta etapa tiene {count} tarjeta(s). Elija a dónde van.",
+      "DELETE_TARGET_LABEL": "Mover las tarjetas a",
+      "DELETE_CONFIRM": "Eliminar",
+      "DELETE_LAST": "Un tablero necesita al menos una etapa.",
+      "SAVED": "Etapa guardada.",
+      "CREATED": "Etapa creada.",
+      "DELETED": "Etapa eliminada.",
+      "PROBABILITY_LABEL": "Probabilidad de cierre (%)",
+      "PROBABILITY_HINT": "Se usa en el valor ponderado del embudo."
+    },
+    "CONVERSATION": {
+      "SIDEBAR_TITLE": "Embudo",
+      "EMPTY": "Esta conversación todavía no está en ningún embudo.",
+      "CREATE": "Crear tarjeta",
+      "PICK_BOARD": "Elija el tablero",
+      "OPEN_BOARD": "Abrir en el tablero",
+      "STEP_CHANGED": "Etapa modificada."
+    },
+    "FILTERS": {
+      "SEARCH_PLACEHOLDER": "Buscar por título o descripción",
+      "ANY_AGENT": "Todos los agentes",
+      "ANY_INBOX": "Todas las bandejas",
+      "ANY_PRIORITY": "Todas las prioridades",
+      "ANY_LABEL": "Todas las etiquetas",
+      "CLEAR_ONE": "Quitar este filtro",
+      "CLEAR_ALL": "Limpiar filtros",
+      "SHOWING": "mostrando {visible} de {total}",
+      "EMPTY_TITLE": "Ninguna tarjeta coincide con estos filtros",
+      "EMPTY_SUBTITLE": "Ajuste o limpie los filtros para ver las tarjetas del tablero.",
+      "DRAG_DISABLED": "Arrastrar solo está disponible al ordenar por posición.",
+      "ANY_DUE": "Cualquier vencimiento",
+      "DUE": {
+        "OVERDUE": "Atrasadas",
+        "TODAY": "Vencen hoy",
+        "WEEK": "Próximos 7 días",
+        "NONE": "Sin vencimiento"
+      },
+      "ATTRIBUTE_KEY": "Atributo",
+      "ATTRIBUTE_VALUE": "Valor del atributo",
+      "SAVE_VIEW": "Guardar vista",
+      "VIEW_NAME": "Nombre de la vista",
+      "REMOVE_VIEW": "Quitar vista"
+    },
+    "SORT": {
+      "LABEL": "Ordenar por",
+      "POSITION": "Posición",
+      "PRIORITY": "Prioridad",
+      "DUE": "Vencimiento",
+      "CREATED": "Más recientes",
+      "UPDATED": "Última actividad",
+      "TITLE": "Título"
+    },
+    "SETTINGS": {
+      "TITLE": "Configuración del tablero",
+      "SAVE": "Guardar",
+      "CANCEL": "Cancelar",
+      "SAVED": "Configuración guardada.",
+      "CURRENCY_LABEL": "Moneda",
+      "CURRENCY_HINT": "Código ISO de 3 letras, ej.: BRL",
+      "MEMBERS": "Miembros",
+      "MEMBERS_HINT": "Solo estas personas ven el tablero. Los administradores siempre lo ven.",
+      "MEMBERS_PLACEHOLDER": "Elija los agentes",
+      "ROLE_LABEL": "Rol",
+      "SCOPE_LABEL": "Visibilidad",
+      "ROLES": {
+        "MANAGER": "Gestor",
+        "MEMBER": "Miembro",
+        "VIEWER": "Solo lectura"
+      },
+      "SCOPES": {
+        "ALL_TASKS": "Todas las tarjetas",
+        "OWN_TASKS": "Solo las propias"
+      },
+      "INBOXES": "Bandejas de entrada",
+      "INBOXES_HINT": "Qué canales alimentan este embudo.",
+      "INBOXES_PLACEHOLDER": "Elija las bandejas",
+      "NO_INBOXES": "No se encontró ninguna bandeja",
+      "CONFIGURE": "Configurar tablero",
+      "PIPELINE_VALUE": "valor ponderado",
+      "REORDER_HINT": "Arrastre el encabezado para reordenar las etapas."
+    },
+    "REPORT": {
+      "TITLE": "Informe del embudo",
+      "PERIOD": "Período",
+      "LAST_DAYS": "Últimos {days} días",
+      "EXPORT": "Exportar CSV",
+      "PICK_BOARD": "Elija un tablero para ver el informe.",
+      "BY_STAGE": "Tarjetas por etapa",
+      "BY_STAGE_LEGEND": "tarjetas · edad mediana · detenidas",
+      "STAGE_TOOLTIP": "{count} tarjetas, {stalled} detenidas",
+      "CLOSURES": "Cierres a lo largo del tiempo",
+      "NO_CLOSURES": "Nada se cerró en el período.",
+      "CONVERSION": "Conversión entre etapas",
+      "NO_CONVERSION": "Ninguna tarjeta cambió de etapa en el período.",
+      "AGENTS": "Ranking de agentes",
+      "AGENT": "Agente",
+      "NO_AGENTS": "Ninguna tarjeta tiene responsable.",
+      "WON": "Ganados",
+      "LOST": "Perdidos",
+      "OPEN": "Abiertos",
+      "STALLED": "Tarjetas detenidas",
+      "DAYS": "hace {days} días",
+      "TILES": {
+        "CREATED": "Creados",
+        "WON": "Ganados",
+        "LOST": "Perdidos",
+        "WIN_RATE": "Tasa de éxito",
+        "OPEN_VALUE": "Abierto",
+        "WEIGHTED_VALUE": "Ponderado"
+      }
+    },
+    "AUTOMATIONS": {
+      "TITLE": "Automatizaciones",
+      "HINT": "Se aplican a las bandejas vinculadas arriba. Cada ejecución queda registrada.",
+      "RULES": {
+        "CREATE_TASK_ON_CONVERSATION": "Crear tarjeta automáticamente para una conversación nueva",
+        "AUTO_ASSIGN_TASK": "Asignar la tarjeta a quien atiende la conversación",
+        "WIN_TASK_ON_CONVERSATION_RESOLVED": "Mover la tarjeta a Ganado al resolver la conversación",
+        "RESOLVE_CONVERSATION_ON_FINAL_STEP": "Resolver la conversación cuando la tarjeta cierra",
+        "SYNC_ASSIGNEES": "Mantener el mismo responsable en ambos",
+        "SYNC_LABELS_AND_PRIORITY": "Mantener la misma prioridad en ambos"
+      }
+    },
+    "STATES": {
+      "ERROR_TITLE": "No se pudo cargar el embudo",
+      "ERROR_SUBTITLE": "La conexión falló o el servidor no respondió. Inténtelo de nuevo.",
+      "RETRY": "Intentar de nuevo",
+      "FORBIDDEN_TITLE": "No tiene acceso a ningún tablero",
+      "FORBIDDEN_SUBTITLE": "Pida a un administrador que lo agregue como miembro de un tablero.",
+      "OFFLINE": "Sin conexión — el tablero puede estar desactualizado."
+    }
+  }
+}

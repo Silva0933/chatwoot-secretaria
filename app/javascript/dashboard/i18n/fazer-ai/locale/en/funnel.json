@@ -1,0 +1,289 @@
+{
+  "FUNNEL": {
+    "HEADER": "Funnel",
+    "LOADING": "Loading the board...",
+    "DISABLED": {
+      "TITLE": "Funnel is not enabled for this account",
+      "SUBTITLE": "Ask the instance administrator to enable the Funnel module for this account."
+    },
+    "BOARD": {
+      "SWITCH": "Switch board",
+      "NEW": "New board",
+      "ARCHIVE": "Archive board",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Archive {name}?",
+        "DESCRIPTION": "The board leaves the list and its cards stop showing up. The support history is preserved.",
+        "CONFIRM": "Archive",
+        "CANCEL": "Cancel"
+      },
+      "TOTAL": "cards on the board"
+    },
+    "EMPTY_STATE": {
+      "TITLE": "No boards yet",
+      "SUBTITLE": "Create the first board to follow your patients stage by stage.",
+      "ACTION": "Create board"
+    },
+    "COLUMN": {
+      "ADD_CARD": "Add card",
+      "EMPTY": "No cards in this stage"
+    },
+    "CARD": {
+      "OVERDUE": "Overdue",
+      "DUE": "Due {date}",
+      "CONVERSATIONS": "{count} conversation | {count} conversations",
+      "OPEN": "Open card",
+      "NO_TITLE": "Untitled",
+      "TODAY": "Today",
+      "TOMORROW": "Tomorrow",
+      "TIME_IN_STEP": "Time in this stage",
+      "OPEN_CONVERSATION": "Open conversation",
+      "CONFIGURE": "Edit card"
+    },
+    "PRIORITY": {
+      "LABEL": "Priority",
+      "NONE": "No priority",
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "STAGE_TYPE": {
+      "OPEN": "In progress",
+      "WON": "Won",
+      "LOST": "Lost"
+    },
+    "TASK": {
+      "CREATE_TITLE": "New card",
+      "EDIT_TITLE": "Edit card",
+      "TITLE_LABEL": "Title",
+      "TITLE_PLACEHOLDER": "e.g. Maria's follow-up",
+      "TITLE_REQUIRED": "Give the card a title",
+      "DESCRIPTION_LABEL": "Description",
+      "DESCRIPTION_PLACEHOLDER": "Details the team needs to know",
+      "STEP_LABEL": "Stage",
+      "DUE_AT_LABEL": "Due date",
+      "CREATE": "Create card",
+      "SAVE": "Save",
+      "CANCEL": "Cancel",
+      "ARCHIVE": "Archive card",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Archive this card?",
+        "DESCRIPTION": "It leaves the board but stays in the history.",
+        "CONFIRM": "Archive",
+        "CANCEL": "Cancel"
+      },
+      "ASSIGNEES": "Assignees",
+      "LABELS": "Labels",
+      "CONTACTS": "Contacts",
+      "VALUE_LABEL": "Value",
+      "ATTRIBUTES": "Custom attributes",
+      "ATTRIBUTE_KEY": "Key",
+      "ATTRIBUTE_VALUE": "Value",
+      "ATTRIBUTE_ADD": "Add attribute",
+      "ATTRIBUTE_REMOVE": "Remove attribute"
+    },
+    "BOARD_DIALOG": {
+      "TITLE": "New board",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g. Patient journey",
+      "NAME_REQUIRED": "Give the board a name",
+      "DESCRIPTION_LABEL": "Description",
+      "DESCRIPTION_PLACEHOLDER": "What this board is for",
+      "TEMPLATE_LABEL": "Starting stages",
+      "TEMPLATE": {
+        "CLINIC": "Clinic (8 stages)",
+        "BLANK": "Simple (3 stages)"
+      },
+      "CREATE": "Create board",
+      "CANCEL": "Cancel"
+    },
+    "API": {
+      "BOARDS_ERROR": "Could not load the boards.",
+      "TASKS_ERROR": "Could not load the cards.",
+      "BOARD_CREATED": "Board created.",
+      "BOARD_ARCHIVED": "Board archived.",
+      "TASK_CREATED": "Card created.",
+      "TASK_UPDATED": "Card updated.",
+      "TASK_ARCHIVED": "Card archived.",
+      "MOVE_ERROR": "Could not move the card. The board was reloaded."
+    },
+    "ASSOCIATIONS": {
+      "ASSIGNEES_PLACEHOLDER": "Pick the assignees",
+      "LABELS_PLACEHOLDER": "Pick the labels",
+      "SEARCH": "Search...",
+      "SEARCHING": "Searching...",
+      "NO_AGENTS": "No agent found",
+      "NO_LABELS": "No label found",
+      "CONTACT_PLACEHOLDER": "Search a contact by name, email or phone",
+      "REMOVE_CONTACT": "Remove contact",
+      "CONVERSATIONS": "Conversations",
+      "NO_CONVERSATIONS": "No conversation linked to this card",
+      "CONVERSATION_PLACEHOLDER": "Conversation number",
+      "LINK": "Link",
+      "UNLINK": "Unlink",
+      "PRIMARY": "Primary",
+      "MAKE_PRIMARY": "Make primary",
+      "AFTER_CREATE": "Assignees, labels, contacts and conversations become available once the card is created."
+    },
+    "ACTIVITY": {
+      "TITLE": "Activity",
+      "EMPTY": "Nothing has happened to this card yet.",
+      "SYSTEM": "System",
+      "TYPES": {
+        "MOVED": "Card moved to another stage",
+        "ASSIGNEES_REPLACED": "Assignees changed",
+        "LABELS_REPLACED": "Labels changed",
+        "CONTACTS_REPLACED": "Contacts changed",
+        "CONVERSATION_LINKED": "Conversation linked",
+        "CONVERSATION_PROMOTED": "Primary conversation changed",
+        "CONVERSATION_UNLINKED": "Conversation unlinked"
+      }
+    },
+    "STEP": {
+      "CONFIGURE": "Configure stage",
+      "NEW": "New stage",
+      "EDIT": "Edit stage",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g. Waiting for exam",
+      "COLOR_LABEL": "Colour",
+      "TYPE_LABEL": "Stage type",
+      "TYPE_HINT": "Won and Lost close the card; In progress keeps it in the funnel.",
+      "SAVE": "Save",
+      "CREATE": "Create stage",
+      "CANCEL": "Cancel",
+      "DELETE": "Delete stage",
+      "DELETE_CONFIRM_TITLE": "Delete the stage {name}?",
+      "DELETE_CONFIRM_EMPTY": "The stage is empty and can be deleted safely.",
+      "DELETE_CONFIRM_MOVE": "This stage holds {count} card(s). Choose where they go.",
+      "DELETE_TARGET_LABEL": "Move the cards to",
+      "DELETE_CONFIRM": "Delete",
+      "DELETE_LAST": "A board needs at least one stage.",
+      "SAVED": "Stage saved.",
+      "CREATED": "Stage created.",
+      "DELETED": "Stage deleted.",
+      "PROBABILITY_LABEL": "Probability to close (%)",
+      "PROBABILITY_HINT": "Used for the weighted pipeline value."
+    },
+    "CONVERSATION": {
+      "SIDEBAR_TITLE": "Funnel",
+      "EMPTY": "This conversation is not on any funnel yet.",
+      "CREATE": "Create a card",
+      "PICK_BOARD": "Pick the board",
+      "OPEN_BOARD": "Open on the board",
+      "STEP_CHANGED": "Stage changed."
+    },
+    "FILTERS": {
+      "SEARCH_PLACEHOLDER": "Search by title or description",
+      "ANY_AGENT": "All agents",
+      "ANY_INBOX": "All inboxes",
+      "ANY_PRIORITY": "All priorities",
+      "ANY_LABEL": "All labels",
+      "CLEAR_ONE": "Remove this filter",
+      "CLEAR_ALL": "Clear filters",
+      "SHOWING": "showing {visible} of {total}",
+      "EMPTY_TITLE": "No card matches these filters",
+      "EMPTY_SUBTITLE": "Adjust or clear the filters to see the cards on the board.",
+      "DRAG_DISABLED": "Dragging is available only when sorting by position.",
+      "ANY_DUE": "Any due date",
+      "DUE": {
+        "OVERDUE": "Overdue",
+        "TODAY": "Due today",
+        "WEEK": "Next 7 days",
+        "NONE": "No due date"
+      },
+      "ATTRIBUTE_KEY": "Attribute",
+      "ATTRIBUTE_VALUE": "Attribute value",
+      "SAVE_VIEW": "Save view",
+      "VIEW_NAME": "View name",
+      "REMOVE_VIEW": "Remove view"
+    },
+    "SORT": {
+      "LABEL": "Sort by",
+      "POSITION": "Position",
+      "PRIORITY": "Priority",
+      "DUE": "Due date",
+      "CREATED": "Newest",
+      "UPDATED": "Last activity",
+      "TITLE": "Title"
+    },
+    "SETTINGS": {
+      "TITLE": "Board settings",
+      "SAVE": "Save",
+      "CANCEL": "Cancel",
+      "SAVED": "Settings saved.",
+      "CURRENCY_LABEL": "Currency",
+      "CURRENCY_HINT": "3-letter ISO code, e.g. BRL",
+      "MEMBERS": "Members",
+      "MEMBERS_HINT": "Only these people see the board. Account administrators always do.",
+      "MEMBERS_PLACEHOLDER": "Pick the agents",
+      "ROLE_LABEL": "Role",
+      "SCOPE_LABEL": "Visibility",
+      "ROLES": {
+        "MANAGER": "Manager",
+        "MEMBER": "Member",
+        "VIEWER": "Read only"
+      },
+      "SCOPES": {
+        "ALL_TASKS": "All cards",
+        "OWN_TASKS": "Only their own"
+      },
+      "INBOXES": "Inboxes",
+      "INBOXES_HINT": "Which channels feed this funnel.",
+      "INBOXES_PLACEHOLDER": "Pick the inboxes",
+      "NO_INBOXES": "No inbox found",
+      "CONFIGURE": "Configure board",
+      "PIPELINE_VALUE": "weighted value",
+      "REORDER_HINT": "Drag the header to reorder the stages."
+    },
+    "REPORT": {
+      "TITLE": "Funnel report",
+      "PERIOD": "Period",
+      "LAST_DAYS": "Last {days} days",
+      "EXPORT": "Export CSV",
+      "PICK_BOARD": "Pick a board to see the report.",
+      "BY_STAGE": "Cards per stage",
+      "BY_STAGE_LEGEND": "cards · median age · stalled",
+      "STAGE_TOOLTIP": "{count} cards, {stalled} stalled",
+      "CLOSURES": "Closures over time",
+      "NO_CLOSURES": "Nothing closed in the period.",
+      "CONVERSION": "Stage conversion",
+      "NO_CONVERSION": "No card changed stage in the period.",
+      "AGENTS": "Agent ranking",
+      "AGENT": "Agent",
+      "NO_AGENTS": "No card has an assignee.",
+      "WON": "Won",
+      "LOST": "Lost",
+      "OPEN": "Open",
+      "STALLED": "Stalled cards",
+      "DAYS": "{days} days ago",
+      "TILES": {
+        "CREATED": "Created",
+        "WON": "Won",
+        "LOST": "Lost",
+        "WIN_RATE": "Win rate",
+        "OPEN_VALUE": "Open",
+        "WEIGHTED_VALUE": "Weighted"
+      }
+    },
+    "AUTOMATIONS": {
+      "TITLE": "Automations",
+      "HINT": "They apply to the inboxes linked above. Every run is recorded.",
+      "RULES": {
+        "CREATE_TASK_ON_CONVERSATION": "Create a card automatically for a new conversation",
+        "AUTO_ASSIGN_TASK": "Assign the card to whoever handles the conversation",
+        "WIN_TASK_ON_CONVERSATION_RESOLVED": "Move the card to Won when the conversation is resolved",
+        "RESOLVE_CONVERSATION_ON_FINAL_STEP": "Resolve the conversation when the card closes",
+        "SYNC_ASSIGNEES": "Keep the assignee the same on both",
+        "SYNC_LABELS_AND_PRIORITY": "Keep the priority the same on both"
+      }
+    },
+    "STATES": {
+      "ERROR_TITLE": "Could not load the funnel",
+      "ERROR_SUBTITLE": "The connection failed or the server did not answer. Try again.",
+      "RETRY": "Try again",
+      "FORBIDDEN_TITLE": "You have access to no board",
+      "FORBIDDEN_SUBTITLE": "Ask an administrator to add you as a member of a board.",
+      "OFFLINE": "Offline — the board may be out of date."
+    }
+  }
+}

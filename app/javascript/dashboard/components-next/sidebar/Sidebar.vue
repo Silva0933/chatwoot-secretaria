@@ -43,7 +43,7 @@ const emit = defineEmits([
   'closeMobileSidebar',
 ]);
 
-const { accountScopedRoute, isOnChatwootCloud } = useAccount();
+const { accountScopedRoute, currentAccount, isOnChatwootCloud } = useAccount();
 const { isEnterprise } = useConfig();
 const store = useStore();
 
@@ -51,6 +51,12 @@ const store = useStore();
 // on community so it doesn't lead to a dashboard/CTA the backend can't serve.
 const isCallsAvailable = computed(
   () => isOnChatwootCloud.value || isEnterprise
+);
+
+// O Funil e ligado por conta em account.settings, nao por feature_flags: a coluna de flags
+// esta cheia e as posicoes de bit divergem entre este fork e o Pro. Ver Custom::Concerns::Account.
+const isFunnelAvailable = computed(
+  () => currentAccount.value?.settings?.funnel_kanban_enabled === true
 );
 const searchShortcut = useKbd([`$mod`, 'k']);
 const { t } = useI18n();
@@ -519,13 +525,17 @@ const menuItems = computed(() => {
         count: 'internalChat/getUnreadCount',
       },
     },
-    {
-      name: 'Kanban',
-      label: t('SIDEBAR.KANBAN'),
-      icon: 'i-lucide-columns-3',
-      to: accountScopedRoute('kanban_view'),
-      activeOn: ['kanban_view'],
-    },
+    ...(isFunnelAvailable.value
+      ? [
+          {
+            name: 'Funnel',
+            label: t('SIDEBAR.FUNNEL'),
+            icon: 'i-lucide-filter',
+            to: accountScopedRoute('funnel_view'),
+            activeOn: ['funnel_view'],
+          },
+        ]
+      : []),
     {
       name: 'Captain',
       icon: 'i-woot-captain',

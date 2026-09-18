@@ -1,3 +1,4 @@
+import camelcaseKeys from 'camelcase-keys';
 import AuthAPI from '../api/auth';
 import BaseActionCableConnector from '../../shared/helpers/BaseActionCableConnector';
 import DashboardAudioNotificationHelper from './AudioAlerts/DashboardAudioNotificationHelper';
@@ -6,6 +7,7 @@ import { emitter } from 'shared/helpers/mitt';
 import { useImpersonation } from 'dashboard/composables/useImpersonation';
 import { pendingGroupNavigation } from 'dashboard/helper/pendingGroupNavigation';
 import { useCallsStore } from 'dashboard/stores/calls';
+import { useFunnelStore } from 'dashboard/stores/funnel';
 import {
   applyOutboundAnswer,
   armOutboundRecorder,
@@ -51,6 +53,11 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.mentionUnreadCountsRetryTimer = null;
     this.filteredUnreadCountsRetryTimer = null;
     this.events = {
+      'funnel.task.created': this.onFunnelTaskChanged,
+      'funnel.task.updated': this.onFunnelTaskChanged,
+      'funnel.task.moved': this.onFunnelTaskChanged,
+      'funnel.task.deleted': this.onFunnelTaskDeleted,
+      'funnel.board.updated': this.onFunnelBoardUpdated,
       'message.created': this.onMessageCreated,
       'message.updated': this.onMessageUpdated,
       'conversation.created': this.onConversationCreated,
@@ -204,6 +211,28 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   // eslint-disable-next-line class-methods-use-this
   onLogout = () => AuthAPI.logout();
+
+  // Os tres eventos de card caem no mesmo tratador: a store faz upsert, entao criado, editado e
+  // movido levam ao mesmo lugar. Ficam separados no mapa porque o backend os distingue e uma
+  // animacao de movimento pode querer essa diferenca depois.
+  // eslint-disable-next-line class-methods-use-this
+  onFunnelTaskChanged = data => {
+    useFunnelStore().applyRemoteTask(
+      camelcaseKeys(data, { deep: true, stopPaths: ['custom_attributes'] })
+    );
+  };
+
+  // eslint-disable-next-line class-methods-use-this
+  onFunnelTaskDeleted = data => {
+    useFunnelStore().applyRemoteTaskRemoval(
+      camelcaseKeys(data, { deep: true })
+    );
+  };
+
+  // eslint-disable-next-line class-methods-use-this
+  onFunnelBoardUpdated = data => {
+    useFunnelStore().applyRemoteBoard(camelcaseKeys(data, { deep: true }));
+  };
 
   onMessageCreated = data => {
     const {

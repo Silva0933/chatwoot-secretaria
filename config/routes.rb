@@ -395,6 +395,56 @@ Rails.application.routes.draw do
           end
           resources :labels, only: [:index, :show, :create, :update, :destroy]
 
+          # Modulo Funnel (Kanban). Codigo em custom/, ver config/application.rb.
+          if ChatwootApp.custom?
+            # Adaptador para o contrato de Kanban da fazer.ai Pro. Existe para o projeto
+            # fazer.ai agents falar com este fork sem mudar o cliente dele; a regra de negocio
+            # continua toda em Funnel::.
+            namespace :kanban do
+              resources :boards, only: [:index, :show, :create, :update] do
+                member do
+                  post :update_inboxes
+                  post :update_agents
+                end
+                resources :steps, only: [:index, :create], controller: 'board_steps'
+              end
+              resources :tasks, only: [:index, :show, :create, :update] do
+                post :move, on: :member
+              end
+              # Enderecado pela conversa em vez do id do card: e o ponto de entrada que um agente
+              # de IA respondendo uma mensagem consegue alcancar sozinho. O id e o display_id.
+              resources :conversation_cards, only: [:show], param: :conversation_id do
+                post :move, on: :member
+              end
+            end
+
+            namespace :funnel do
+              # O caminho inverso: o card visto e criado de dentro da conversa. O id aqui e o
+              # display_id, como no resto da API do core.
+              resources :conversations, only: [] do
+                resources :tasks, only: [:index, :create], controller: 'conversation_tasks'
+              end
+              resources :boards, only: [:index, :show, :create, :update, :destroy] do
+                resources :steps, only: [:create, :update, :destroy] do
+                  patch :reorder, on: :collection
+                end
+                resource :report, only: [:show]
+                resource :members, only: [:update]
+                resource :inboxes, only: [:update]
+                resources :tasks, only: [:index, :show, :create, :update, :destroy] do
+                  patch :move, on: :member
+                  # Conjuntos trocados por inteiro, entao resource no singular e so update.
+                  resource :assignees, only: [:update], controller: 'tasks/assignees'
+                  resource :labels, only: [:update], controller: 'tasks/labels'
+                  resource :contacts, only: [:update], controller: 'tasks/contacts'
+                  # O id aqui e o display_id da conversa, como no resto da API do core.
+                  resources :conversations, only: [:create, :update, :destroy], controller: 'tasks/conversations'
+                  resources :events, only: [:index], controller: 'tasks/events'
+                end
+              end
+            end
+          end
+
           resources :notifications, only: [:index, :update, :destroy] do
             collection do
               post :read_all

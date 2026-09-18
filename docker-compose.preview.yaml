@@ -1,0 +1,157 @@
+# Ambiente de preview no Coolify.
+#
+# Diferente de docker-compose.coolify.yaml, que puxa ghcr.io/fazer-ai/chatwoot: aquele e a
+# imagem do upstream e nao conteria o modulo Funnel. Aqui o proprio servidor constroi a imagem
+# a partir do codigo da branch, entao nao existe registro no meio e nada precisa de credencial.
+#
+# rails e sidekiq compartilham a mesma tag e o mesmo bloco build de proposito: sao o mesmo
+# processo Rails com comandos diferentes, e uma tag so faz o segundo build sair inteiro do cache
+# em vez de compilar as gems nativas duas vezes.
+#
+# SERVICE_FQDN_RAILS_3000 e variavel magica do Coolify: ela faz o proxy publicar a porta 3000
+# do servico rails no dominio do recurso e devolve a URL ja com https.
+
+services:
+  rails:
+    image: 'secretaria-v4-preview:latest'
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    volumes:
+      - 'storage:/app/storage'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_RAILS_3000
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - RAILS_LOG_TO_STDOUT=true
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEFAULT_LOCALE=pt_BR
+      - FRONTEND_URL=${SERVICE_FQDN_RAILS_3000}
+      - INTERNAL_HOST_URL=http://rails:3000
+      - FORCE_SSL=false
+      - ENABLE_ACCOUNT_SIGNUP=false
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USERNAME=${POSTGRES_USERNAME:-chatwoot}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DB:-chatwoot_preview}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - MAILER_SENDER_EMAIL=${MAILER_SENDER_EMAIL:-Secretaria <nao-responda@localhost>}
+    entrypoint: docker/entrypoints/rails.sh
+    command:
+      - bundle
+      - exec
+      - rails
+      - s
+      - '-p'
+      - '3000'
+      - '-b'
+      - 0.0.0.0
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- --header="Accept: text/html" http://127.0.0.1:3000/'
+      interval: 30s
+      timeout: 20s
+      # O primeiro boot roda db:chatwoot_prepare com todas as migrations do zero; sem um
+      # start_period generoso o Coolify marcaria o deploy como falho antes de o Rails subir.
+      start_period: 300s
+      retries: 10
+
+  sidekiq:
+    image: 'secretaria-v4-preview:latest'
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    volumes:
+      - 'storage:/app/storage'
+    depends_on:
+      rails:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - RAILS_LOG_TO_STDOUT=true
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEFAULT_LOCALE=pt_BR
+      - FRONTEND_URL=${SERVICE_FQDN_RAILS_3000}
+      - INTERNAL_HOST_URL=http://rails:3000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USERNAME=${POSTGRES_USERNAME:-chatwoot}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DB:-chatwoot_preview}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - MAILER_SENDER_EMAIL=${MAILER_SENDER_EMAIL:-Secretaria <nao-responda@localhost>}
+    command:
+      - bundle
+      - exec
+      - sidekiq
+      - '-C'
+      - config/sidekiq.yml
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'ps aux | grep [s]idekiq'
+      interval: 30s
+      timeout: 20s
+      start_period: 120s
+      retries: 10
+
+  # pgvector e nao postgres puro: o Captain usa a extensao vector e db:chatwoot_prepare
+  # tenta habilita-la na preparacao do banco.
+  postgres:
+    image: 'pgvector/pgvector:pg16'
+    restart: always
+    volumes:
+      - 'postgres:/var/lib/postgresql/data'
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-chatwoot_preview}
+      - POSTGRES_USER=${POSTGRES_USERNAME:-chatwoot}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -h localhost -p 5432 -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 10s
+      timeout: 10s
+      start_period: 60s
+      retries: 10
+
+  redis:
+    image: 'redis:alpine'
+    restart: always
+    command:
+      - sh
+      - '-c'
+      - 'redis-server --requirepass "${REDIS_PASSWORD}"'
+    volumes:
+      - 'redis:/data'
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli -h localhost -p 6379 -a $${REDIS_PASSWORD} ping'
+      interval: 10s
+      timeout: 10s
+      start_period: 20s
+      retries: 10
+
+volumes:
+  storage:
+  postgres:
+  redis:

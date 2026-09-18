@@ -33,14 +33,16 @@ module ChatwootApp
     ENV.fetch('HELPCENTER_URL', nil) || ENV.fetch('FRONTEND_URL', nil)
   end
 
+  # Lista so as extensoes que existem de fato. Antes, custom? verdadeiro devolvia
+  # %w[enterprise custom] mesmo sem a pasta enterprise, e ai o injetor procurava o namespace
+  # Enterprise, recebia false de const_get_maybe_false e chamava const_defined? nele: o &. do
+  # helper protege contra nil, nao contra false. Tambem faz DISABLE_ENTERPRISE valer quando
+  # custom/ existe, o que antes ele ignorava.
   def self.extensions
-    if custom?
-      %w[enterprise custom]
-    elsif enterprise?
-      %w[enterprise]
-    else
-      %w[]
-    end
+    names = []
+    names << 'enterprise' if enterprise?
+    names << 'custom' if custom?
+    names
   end
 
   def self.advanced_search_allowed?

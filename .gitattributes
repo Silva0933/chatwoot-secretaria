@@ -1,0 +1,7 @@
+# O checkout no Windows com core.autocrlf=true entrega estes arquivos com CRLF, e o
+# container roda Linux: o shebang vira "/bin/sh\r" e o Docker responde
+# "exec docker/entrypoints/rails.sh: no such file or directory".
+# Fixar LF aqui resolve para todo clone e worktree, nao so para esta maquina.
+*.sh text eol=lf
+docker/entrypoints/** text eol=lf
+bin/* text eol=lf

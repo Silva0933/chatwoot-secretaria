@@ -1,0 +1,289 @@
+{
+  "FUNNEL": {
+    "HEADER": "Funil",
+    "LOADING": "Carregando o quadro...",
+    "DISABLED": {
+      "TITLE": "O Funil não está ativo nesta conta",
+      "SUBTITLE": "Peça ao administrador da instância para habilitar o módulo Funil para esta conta."
+    },
+    "BOARD": {
+      "SWITCH": "Trocar de quadro",
+      "NEW": "Novo quadro",
+      "ARCHIVE": "Arquivar quadro",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Arquivar {name}?",
+        "DESCRIPTION": "O quadro sai da lista e os cards param de aparecer. O histórico de atendimento é preservado.",
+        "CONFIRM": "Arquivar",
+        "CANCEL": "Cancelar"
+      },
+      "TOTAL": "cards no quadro"
+    },
+    "EMPTY_STATE": {
+      "TITLE": "Nenhum quadro por aqui",
+      "SUBTITLE": "Crie o primeiro quadro para acompanhar seus pacientes por etapa.",
+      "ACTION": "Criar quadro"
+    },
+    "COLUMN": {
+      "ADD_CARD": "Adicionar card",
+      "EMPTY": "Nenhum card nesta etapa"
+    },
+    "CARD": {
+      "OVERDUE": "Atrasado",
+      "DUE": "Vence em {date}",
+      "CONVERSATIONS": "{count} conversa | {count} conversas",
+      "OPEN": "Abrir card",
+      "NO_TITLE": "Sem título",
+      "TODAY": "Hoje",
+      "TOMORROW": "Amanhã",
+      "TIME_IN_STEP": "Tempo nesta etapa",
+      "OPEN_CONVERSATION": "Abrir conversa",
+      "CONFIGURE": "Editar card"
+    },
+    "PRIORITY": {
+      "LABEL": "Prioridade",
+      "NONE": "Sem prioridade",
+      "LOW": "Baixa",
+      "MEDIUM": "Média",
+      "HIGH": "Alta",
+      "URGENT": "Urgente"
+    },
+    "STAGE_TYPE": {
+      "OPEN": "Em andamento",
+      "WON": "Ganho",
+      "LOST": "Perdido"
+    },
+    "TASK": {
+      "CREATE_TITLE": "Novo card",
+      "EDIT_TITLE": "Editar card",
+      "TITLE_LABEL": "Título",
+      "TITLE_PLACEHOLDER": "Ex.: Retorno da Maria",
+      "TITLE_REQUIRED": "Informe um título para o card",
+      "DESCRIPTION_LABEL": "Descrição",
+      "DESCRIPTION_PLACEHOLDER": "Detalhes que a equipe precisa saber",
+      "STEP_LABEL": "Etapa",
+      "DUE_AT_LABEL": "Prazo",
+      "CREATE": "Criar card",
+      "SAVE": "Salvar",
+      "CANCEL": "Cancelar",
+      "ARCHIVE": "Arquivar card",
+      "ARCHIVE_CONFIRM": {
+        "TITLE": "Arquivar este card?",
+        "DESCRIPTION": "Ele sai do quadro, mas continua no histórico.",
+        "CONFIRM": "Arquivar",
+        "CANCEL": "Cancelar"
+      },
+      "ASSIGNEES": "Responsáveis",
+      "LABELS": "Etiquetas",
+      "CONTACTS": "Contatos",
+      "VALUE_LABEL": "Valor",
+      "ATTRIBUTES": "Atributos personalizados",
+      "ATTRIBUTE_KEY": "Chave",
+      "ATTRIBUTE_VALUE": "Valor",
+      "ATTRIBUTE_ADD": "Adicionar atributo",
+      "ATTRIBUTE_REMOVE": "Remover atributo"
+    },
+    "BOARD_DIALOG": {
+      "TITLE": "Novo quadro",
+      "NAME_LABEL": "Nome",
+      "NAME_PLACEHOLDER": "Ex.: Jornada do paciente",
+      "NAME_REQUIRED": "Informe um nome para o quadro",
+      "DESCRIPTION_LABEL": "Descrição",
+      "DESCRIPTION_PLACEHOLDER": "Para que serve este quadro",
+      "TEMPLATE_LABEL": "Etapas iniciais",
+      "TEMPLATE": {
+        "CLINIC": "Clínica (8 etapas)",
+        "BLANK": "Simples (3 etapas)"
+      },
+      "CREATE": "Criar quadro",
+      "CANCEL": "Cancelar"
+    },
+    "API": {
+      "BOARDS_ERROR": "Não foi possível carregar os quadros.",
+      "TASKS_ERROR": "Não foi possível carregar os cards.",
+      "BOARD_CREATED": "Quadro criado.",
+      "BOARD_ARCHIVED": "Quadro arquivado.",
+      "TASK_CREATED": "Card criado.",
+      "TASK_UPDATED": "Card atualizado.",
+      "TASK_ARCHIVED": "Card arquivado.",
+      "MOVE_ERROR": "Não foi possível mover o card. O quadro foi recarregado."
+    },
+    "ASSOCIATIONS": {
+      "ASSIGNEES_PLACEHOLDER": "Escolha os responsáveis",
+      "LABELS_PLACEHOLDER": "Escolha as etiquetas",
+      "SEARCH": "Buscar...",
+      "SEARCHING": "Buscando...",
+      "NO_AGENTS": "Nenhum agente encontrado",
+      "NO_LABELS": "Nenhuma etiqueta encontrada",
+      "CONTACT_PLACEHOLDER": "Busque um contato pelo nome, e-mail ou telefone",
+      "REMOVE_CONTACT": "Remover contato",
+      "CONVERSATIONS": "Conversas",
+      "NO_CONVERSATIONS": "Nenhuma conversa vinculada a este card",
+      "CONVERSATION_PLACEHOLDER": "Número da conversa",
+      "LINK": "Vincular",
+      "UNLINK": "Desvincular",
+      "PRIMARY": "Principal",
+      "MAKE_PRIMARY": "Tornar principal",
+      "AFTER_CREATE": "Responsáveis, etiquetas, contatos e conversas ficam disponíveis depois que o card for criado."
+    },
+    "ACTIVITY": {
+      "TITLE": "Histórico",
+      "EMPTY": "Nada aconteceu com este card ainda.",
+      "SYSTEM": "Sistema",
+      "TYPES": {
+        "MOVED": "Card movido de etapa",
+        "ASSIGNEES_REPLACED": "Responsáveis alterados",
+        "LABELS_REPLACED": "Etiquetas alteradas",
+        "CONTACTS_REPLACED": "Contatos alterados",
+        "CONVERSATION_LINKED": "Conversa vinculada",
+        "CONVERSATION_PROMOTED": "Conversa principal alterada",
+        "CONVERSATION_UNLINKED": "Conversa desvinculada"
+      }
+    },
+    "STEP": {
+      "CONFIGURE": "Configurar etapa",
+      "NEW": "Nova etapa",
+      "EDIT": "Editar etapa",
+      "NAME_LABEL": "Nome",
+      "NAME_PLACEHOLDER": "Ex.: Aguardando exame",
+      "COLOR_LABEL": "Cor",
+      "TYPE_LABEL": "Tipo de etapa",
+      "TYPE_HINT": "Ganho e Perdido encerram o card; Em andamento o mantém no funil.",
+      "SAVE": "Salvar",
+      "CREATE": "Criar etapa",
+      "CANCEL": "Cancelar",
+      "DELETE": "Excluir etapa",
+      "DELETE_CONFIRM_TITLE": "Excluir a etapa {name}?",
+      "DELETE_CONFIRM_EMPTY": "A etapa está vazia e pode ser excluída com segurança.",
+      "DELETE_CONFIRM_MOVE": "Esta etapa tem {count} card(s). Escolha para onde eles vão.",
+      "DELETE_TARGET_LABEL": "Mover os cards para",
+      "DELETE_CONFIRM": "Excluir",
+      "DELETE_LAST": "Um quadro precisa de ao menos uma etapa.",
+      "SAVED": "Etapa salva.",
+      "CREATED": "Etapa criada.",
+      "DELETED": "Etapa excluída.",
+      "PROBABILITY_LABEL": "Probabilidade de fechar (%)",
+      "PROBABILITY_HINT": "Usada no valor ponderado do funil."
+    },
+    "CONVERSATION": {
+      "SIDEBAR_TITLE": "Funil",
+      "EMPTY": "Esta conversa ainda não está em nenhum funil.",
+      "CREATE": "Criar card no funil",
+      "PICK_BOARD": "Escolha o quadro",
+      "OPEN_BOARD": "Abrir no quadro",
+      "STEP_CHANGED": "Etapa alterada."
+    },
+    "FILTERS": {
+      "SEARCH_PLACEHOLDER": "Buscar por título ou descrição",
+      "ANY_AGENT": "Todos os agentes",
+      "ANY_INBOX": "Todas as caixas",
+      "ANY_PRIORITY": "Todas as prioridades",
+      "ANY_LABEL": "Todas as etiquetas",
+      "CLEAR_ONE": "Remover este filtro",
+      "CLEAR_ALL": "Limpar filtros",
+      "SHOWING": "mostrando {visible} de {total}",
+      "EMPTY_TITLE": "Nenhum card com esses filtros",
+      "EMPTY_SUBTITLE": "Ajuste ou limpe os filtros para ver os cards do quadro.",
+      "DRAG_DISABLED": "Arraste disponível apenas na ordenação por posição.",
+      "ANY_DUE": "Qualquer prazo",
+      "DUE": {
+        "OVERDUE": "Atrasados",
+        "TODAY": "Vencem hoje",
+        "WEEK": "Próximos 7 dias",
+        "NONE": "Sem prazo"
+      },
+      "ATTRIBUTE_KEY": "Atributo",
+      "ATTRIBUTE_VALUE": "Valor do atributo",
+      "SAVE_VIEW": "Salvar visão",
+      "VIEW_NAME": "Nome da visão",
+      "REMOVE_VIEW": "Remover visão"
+    },
+    "SORT": {
+      "LABEL": "Ordenar por",
+      "POSITION": "Posição",
+      "PRIORITY": "Prioridade",
+      "DUE": "Vencimento",
+      "CREATED": "Mais recentes",
+      "UPDATED": "Última atividade",
+      "TITLE": "Título"
+    },
+    "SETTINGS": {
+      "TITLE": "Configurações do quadro",
+      "SAVE": "Salvar",
+      "CANCEL": "Cancelar",
+      "SAVED": "Configurações salvas.",
+      "CURRENCY_LABEL": "Moeda",
+      "CURRENCY_HINT": "Código ISO de 3 letras, ex.: BRL",
+      "MEMBERS": "Membros",
+      "MEMBERS_HINT": "Só quem está aqui enxerga o quadro. Administradores da conta veem sempre.",
+      "MEMBERS_PLACEHOLDER": "Escolha os agentes",
+      "ROLE_LABEL": "Papel",
+      "SCOPE_LABEL": "Visibilidade",
+      "ROLES": {
+        "MANAGER": "Gestor",
+        "MEMBER": "Membro",
+        "VIEWER": "Somente leitura"
+      },
+      "SCOPES": {
+        "ALL_TASKS": "Todos os cards",
+        "OWN_TASKS": "Só os próprios"
+      },
+      "INBOXES": "Caixas de entrada",
+      "INBOXES_HINT": "Quais canais alimentam este funil.",
+      "INBOXES_PLACEHOLDER": "Escolha as caixas",
+      "NO_INBOXES": "Nenhuma caixa encontrada",
+      "CONFIGURE": "Configurar quadro",
+      "PIPELINE_VALUE": "valor ponderado",
+      "REORDER_HINT": "Arraste o cabeçalho para reordenar as etapas."
+    },
+    "REPORT": {
+      "TITLE": "Relatório do funil",
+      "PERIOD": "Período",
+      "LAST_DAYS": "Últimos {days} dias",
+      "EXPORT": "Exportar CSV",
+      "PICK_BOARD": "Escolha um quadro para ver o relatório.",
+      "BY_STAGE": "Cards por etapa",
+      "BY_STAGE_LEGEND": "cards · idade mediana · parados",
+      "STAGE_TOOLTIP": "{count} cards, {stalled} parados",
+      "CLOSURES": "Fechamentos ao longo do tempo",
+      "NO_CLOSURES": "Nenhum fechamento no período.",
+      "CONVERSION": "Conversão entre etapas",
+      "NO_CONVERSION": "Nenhum card mudou de etapa no período.",
+      "AGENTS": "Ranking de agentes",
+      "AGENT": "Agente",
+      "NO_AGENTS": "Nenhum card com responsável.",
+      "WON": "Ganhos",
+      "LOST": "Perdidos",
+      "OPEN": "Abertos",
+      "STALLED": "Cards parados",
+      "DAYS": "há {days} dias",
+      "TILES": {
+        "CREATED": "Criados",
+        "WON": "Ganhos",
+        "LOST": "Perdidos",
+        "WIN_RATE": "Taxa de ganho",
+        "OPEN_VALUE": "Em aberto",
+        "WEIGHTED_VALUE": "Ponderado"
+      }
+    },
+    "AUTOMATIONS": {
+      "TITLE": "Automações",
+      "HINT": "Valem para as caixas de entrada vinculadas acima. Toda execução fica registrada.",
+      "RULES": {
+        "CREATE_TASK_ON_CONVERSATION": "Criar card automaticamente para conversa nova",
+        "AUTO_ASSIGN_TASK": "Atribuir o card a quem atende a conversa",
+        "WIN_TASK_ON_CONVERSATION_RESOLVED": "Mover o card para Ganho ao resolver a conversa",
+        "RESOLVE_CONVERSATION_ON_FINAL_STEP": "Resolver a conversa quando o card fecha",
+        "SYNC_ASSIGNEES": "Manter o responsável igual nos dois",
+        "SYNC_LABELS_AND_PRIORITY": "Manter a prioridade igual nos dois"
+      }
+    },
+    "STATES": {
+      "ERROR_TITLE": "Não foi possível carregar o funil",
+      "ERROR_SUBTITLE": "A conexão falhou ou o servidor não respondeu. Tente de novo.",
+      "RETRY": "Tentar de novo",
+      "FORBIDDEN_TITLE": "Você não tem acesso a nenhum quadro",
+      "FORBIDDEN_SUBTITLE": "Peça a um administrador para incluir você como membro de um quadro.",
+      "OFFLINE": "Sem conexão — o quadro pode estar desatualizado."
+    }
+  }
+}

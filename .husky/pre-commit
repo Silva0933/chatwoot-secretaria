@@ -5,7 +5,9 @@
 npx --no-install lint-staged
 
 # lint only staged ruby files
-git diff --name-only --cached | xargs ls -1 2>/dev/null | grep '\.rb$' | xargs bundle exec rubocop --force-exclusion
+# --no-run-if-empty: sem ele um commit sem nenhum .rb chama o rubocop sem argumentos, e ele
+# varre o repositorio inteiro e falha nas offenses pre-existentes.
+git diff --name-only --cached | xargs ls -1 2>/dev/null | grep '\.rb$' | xargs --no-run-if-empty bundle exec rubocop --force-exclusion
 
 # stage rubocop changes to files
 # git diff --name-only --cached | xargs git add

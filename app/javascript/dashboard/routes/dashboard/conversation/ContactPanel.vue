@@ -20,6 +20,7 @@ import GroupContactInfo from './contact/GroupContactInfo.vue';
 import ContactNotes from './contact/ContactNotes.vue';
 import ScheduledMessages from './scheduledMessages/ScheduledMessages.vue';
 import ConversationInfo from './ConversationInfo.vue';
+import ConversationFunnelPanel from '../funnel/components/ConversationFunnelPanel.vue';
 import CustomAttributes from './customAttributes/CustomAttributes.vue';
 import SharedFiles from './SharedFiles.vue';
 import Draggable from 'vuedraggable';
@@ -243,6 +244,18 @@ onMounted(() => {
                 :conversation-id="conversationId"
                 :inbox-id="inboxId"
               />
+            </AccordionItem>
+          </div>
+          <div v-else-if="element.name === 'funnel'">
+            <AccordionItem
+              :title="$t('FUNNEL.CONVERSATION.SIDEBAR_TITLE')"
+              :is-open="isContactSidebarItemOpen('is_conv_funnel_open')"
+              compact
+              @toggle="
+                value => toggleSidebarUIState('is_conv_funnel_open', value)
+              "
+            >
+              <ConversationFunnelPanel :conversation-id="conversationId" />
             </AccordionItem>
           </div>
           <div v-else-if="element.name === 'conversation_info'">
