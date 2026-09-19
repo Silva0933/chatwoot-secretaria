@@ -25,7 +25,8 @@
     },
     "COLUMN": {
       "ADD_CARD": "Agregar tarjeta",
-      "EMPTY": "No hay tarjetas en esta etapa"
+      "EMPTY": "No hay tarjetas en esta etapa",
+      "ADD": "Añadir"
     },
     "CARD": {
       "OVERDUE": "Atrasada",
@@ -37,7 +38,21 @@
       "TOMORROW": "Mañana",
       "TIME_IN_STEP": "Tiempo en esta etapa",
       "OPEN_CONVERSATION": "Abrir conversación",
-      "CONFIGURE": "Editar tarjeta"
+      "CONFIGURE": "Editar tarjeta",
+      "UNASSIGNED": "Sin responsable",
+      "WAITING_SINCE": "El cliente espera respuesta desde hace",
+      "MENU": {
+        "LABEL": "Opciones de la tarjeta",
+        "EDIT": "Editar tarjeta",
+        "OPEN_CONVERSATION": "Abrir conversación",
+        "MOVE": "Mover a etapa",
+        "ASSIGN": "Asignar responsable",
+        "UNASSIGN": "Sin responsable",
+        "URGENCY": "Urgencia",
+        "ARCHIVE": "Archivar tarjeta",
+        "BACK": "Volver",
+        "SEARCH_AGENT": "Buscar agente"
+      }
     },
     "PRIORITY": {
       "LABEL": "Prioridad",
@@ -171,7 +186,13 @@
       "CREATED": "Etapa creada.",
       "DELETED": "Etapa eliminada.",
       "PROBABILITY_LABEL": "Probabilidad de cierre (%)",
-      "PROBABILITY_HINT": "Se usa en el valor ponderado del embudo."
+      "PROBABILITY_HINT": "Se usa en el valor ponderado del embudo.",
+      "MENU": {
+        "LABEL": "Opciones de la etapa",
+        "ADD_CARD": "Añadir tarjeta aquí",
+        "MOVE_LEFT": "Mover etapa a la izquierda",
+        "MOVE_RIGHT": "Mover etapa a la derecha"
+      }
     },
     "CONVERSATION": {
       "SIDEBAR_TITLE": "Embudo",
@@ -182,7 +203,7 @@
       "STEP_CHANGED": "Etapa modificada."
     },
     "FILTERS": {
-      "SEARCH_PLACEHOLDER": "Buscar por título o descripción",
+      "SEARCH_PLACEHOLDER": "Buscar tarjeta, contacto o etiqueta",
       "ANY_AGENT": "Todos los agentes",
       "ANY_INBOX": "Todas las bandejas",
       "ANY_PRIORITY": "Todas las prioridades",
@@ -205,7 +226,21 @@
       "MORE": "Más filtros",
       "SAVE_VIEW": "Guardar vista",
       "VIEW_NAME": "Nombre de la vista",
-      "REMOVE_VIEW": "Quitar vista"
+      "REMOVE_VIEW": "Quitar vista",
+      "BUTTON": "Filtros",
+      "ANY_WAITING": "Cualquier espera",
+      "WAITING_LABEL": "Tiempo de espera",
+      "WAITING": {
+        "ANY": "Esperando respuesta",
+        "OVER_1H": "Esperando > 1h",
+        "OVER_4H": "Esperando > 4h"
+      },
+      "AGENT_LABEL": "Responsable",
+      "INBOX_LABEL": "Bandeja",
+      "PRIORITY_LABEL": "Prioridad",
+      "LABEL_LABEL": "Etiqueta",
+      "DUE_LABEL": "Vencimiento",
+      "ATTRIBUTE_LABEL": "Atributo personalizado"
     },
     "SORT": {
       "LABEL": "Ordenar por",
@@ -214,7 +249,8 @@
       "DUE": "Vencimiento",
       "CREATED": "Más recientes",
       "UPDATED": "Última actividad",
-      "TITLE": "Título"
+      "TITLE": "Título",
+      "WAITING": "Tiempo de espera"
     },
     "SETTINGS": {
       "TITLE": "Configuración del tablero",
@@ -294,6 +330,20 @@
       "FORBIDDEN_TITLE": "No tiene acceso a ningún tablero",
       "FORBIDDEN_SUBTITLE": "Pida a un administrador que lo agregue como miembro de un tablero.",
       "OFFLINE": "Sin conexión — el tablero puede estar desactualizado."
+    },
+    "URGENCY": {
+      "MEDIUM": "Normal",
+      "HIGH": "Urgente",
+      "URGENT": "Muy urgente"
+    },
+    "METRICS": {
+      "OPEN_VALUE": "Abierto",
+      "OPPORTUNITIES": "Oportunidades",
+      "CYCLE": "Ciclo medio",
+      "WAITING": "Esperando respuesta",
+      "DAYS": "{count}d",
+      "ADVANCE": "Avance del embudo",
+      "ADVANCE_OF": "{advanced} de {total}"
     }
   }
 }

@@ -13,6 +13,7 @@ import {
   hasActiveFilters,
   camelizeFunnelPayload,
   EMPTY_FILTERS,
+  DEFAULT_SORT,
 } from 'dashboard/helper/funnelHelper';
 
 const createUIFlags = () => ({
@@ -49,7 +50,7 @@ export const useFunnelStore = defineStore('funnel', {
     conversationTasks: [],
     report: null,
     filters: { ...EMPTY_FILTERS },
-    sortBy: 'position',
+    sortBy: DEFAULT_SORT,
     uiFlags: createUIFlags(),
   }),
 
@@ -72,20 +73,6 @@ export const useFunnelStore = defineStore('funnel', {
         this.getSteps,
         this.getFilteredTasks,
         this.sortBy
-      );
-    },
-
-    // Total ponderado: cada card pesa o proprio valor vezes a probabilidade da etapa onde esta.
-    // Respeita o filtro, como o relatorio pede dos contadores.
-    getPipelineValue() {
-      const steps = Object.fromEntries(
-        this.getSteps.map(step => [step.id, (step.probability ?? 0) / 100])
-      );
-
-      return this.getFilteredTasks.reduce(
-        (total, task) =>
-          total + Number(task.value ?? 0) * (steps[task.funnelStepId] ?? 0),
-        0
       );
     },
 
@@ -622,7 +609,7 @@ export const useFunnelStore = defineStore('funnel', {
       this.conversationTasks = [];
       this.report = null;
       this.filters = { ...EMPTY_FILTERS };
-      this.sortBy = 'position';
+      this.sortBy = DEFAULT_SORT;
       this.activeBoardId = null;
       this.uiFlags = createUIFlags();
     },

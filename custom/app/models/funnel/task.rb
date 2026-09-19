@@ -120,6 +120,17 @@ class Funnel::Task < ApplicationRecord
       start_at: start_at, due_at: due_at, overdue: overdue?, archived_at: archived_at,
       lock_version: lock_version, custom_attributes: custom_attributes,
       created_at: created_at, updated_at: updated_at, step_changed_at: step_changed_at
+    }.merge(conversation_event_data)
+  end
+
+  # O relogio de espera do cliente e o trecho da ultima mensagem dele, que o card desenha. Aqui e
+  # um card por evento, entao a consulta em lote do quadro serve com um id so.
+  def conversation_event_data
+    conversation = primary_conversation
+
+    {
+      waiting_since: conversation&.waiting_since,
+      excerpt: Funnel::ConversationPreviews.new([conversation&.id]).perform[conversation&.id].presence || description
     }
   end
 

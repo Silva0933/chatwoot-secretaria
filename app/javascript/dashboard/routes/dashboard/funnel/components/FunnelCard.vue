@@ -1,71 +1,112 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { OnClickOutside } from '@vueuse/components';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
-import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import FunnelCardMenu from './FunnelCardMenu.vue';
 import {
-  timeInStep,
-  dueState,
+  waitingState,
   formatMoney,
-  DUE_STATES,
-  PRIORITY_META,
+  URGENCY_META,
+  WAITING_LEVELS,
 } from 'dashboard/helper/funnelHelper';
 import { useFunnelStore } from 'dashboard/stores/funnel';
 
 const props = defineProps({
   task: { type: Object, required: true },
+  steps: { type: Array, default: () => [] },
+  canArchive: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['open', 'openConversation']);
+const emit = defineEmits([
+  'open',
+  'openConversation',
+  'move',
+  'assign',
+  'setUrgency',
+  'archive',
+]);
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const funnelStore = useFunnelStore();
 
-// Prioridade e vencimento usam icone e texto alem da cor: em escala de cinza, ou para quem nao
-// distingue vermelho de amarelo, a cor sozinha nao diz nada (PRD 5.2, acessibilidade).
-const PRIORITY_CLASSES = {
-  ruby: 'text-n-ruby-11 bg-n-ruby-3',
-  amber: 'text-n-amber-11 bg-n-amber-3',
-  blue: 'text-n-blue-11 bg-n-blue-3',
-  slate: 'text-n-slate-11 bg-n-slate-3',
+const showMenu = ref(false);
+
+// O relogio e a urgencia falam a mesma lingua: ambar quando comeca a doer, rubi quando ja doeu.
+// Sao as duas unicas cores do card, e nenhuma das duas aparece sozinha — sempre com icone.
+const WAITING_CLASSES = {
+  [WAITING_LEVELS.CALM]: 'bg-n-alpha-2 text-n-slate-11',
+  [WAITING_LEVELS.WARN]: 'bg-n-amber-3 text-n-amber-11',
+  [WAITING_LEVELS.ALERT]: 'bg-n-ruby-3 text-n-ruby-11',
 };
 
-const DUE_CLASSES = {
-  [DUE_STATES.OVERDUE]: 'text-n-ruby-11 bg-n-ruby-3',
-  [DUE_STATES.TODAY]: 'text-n-amber-11 bg-n-amber-3',
-  [DUE_STATES.TOMORROW]: 'text-n-amber-11 bg-n-amber-3',
-  [DUE_STATES.FUTURE]: 'text-n-slate-11',
+const URGENCY_CLASSES = {
+  amber: 'text-n-amber-11',
+  ruby: 'text-n-ruby-11',
 };
 
-const MAX_VISIBLE_ASSIGNEES = 3;
-const MAX_VISIBLE_LABELS = 3;
+// A borda a esquerda e o que faz o card destoar da coluna sem gritar: dois pixels na lateral,
+// nao um fundo colorido. Um quadro em que todo card tem fundo proprio vira lista de alarmes.
+const BORDER_CLASSES = {
+  amber:
+    'ltr:border-l-2 rtl:border-r-2 border-l-n-amber-9 rtl:border-r-n-amber-9',
+  ruby: 'ltr:border-l-2 rtl:border-r-2 border-l-n-ruby-9 rtl:border-r-n-ruby-9',
+};
 
-const priority = computed(() => {
-  const meta = PRIORITY_META[props.task.priority];
+const contact = computed(() => (props.task.contacts ?? [])[0] ?? null);
+
+// Conversa de grupo do WhatsApp chega com o id do grupo como titulo: dezoito digitos que nao
+// dizem nada a ninguem. Havendo contato, ele vira o titulo. O id nao se perde — continua sendo o
+// titulo do card quando aberto.
+const GROUP_ID_PATTERN = /^\d{12,}$/;
+
+const title = computed(() => {
+  const raw = props.task.title?.trim();
+  if (!raw) return t('FUNNEL.CARD.NO_TITLE');
+  if (GROUP_ID_PATTERN.test(raw) && contact.value?.name) {
+    return contact.value.name;
+  }
+
+  return raw;
+});
+
+// Quanto vale a oportunidade, na moeda do quadro. Vazio quando nao ha valor: "R$ 0" afirmaria
+// que nao vale nada, e o que se sabe e que ninguem precificou.
+const value = computed(() => {
+  const amount = Number(props.task.value);
+  if (!Number.isFinite(amount) || !amount) return '';
+
+  return formatMoney(amount, funnelStore.getActiveBoard?.currency || 'BRL');
+});
+
+// A ultima coisa que o cliente disse, em duas linhas. O backend ja escolhe a mensagem e ja corta
+// o comprimento; card sem conversa cai para a descricao, que e o unico texto que ele tem.
+const excerpt = computed(() => props.task.excerpt?.trim() || '');
+
+const assignees = computed(() => props.task.assignees ?? []);
+const owner = computed(() => assignees.value[0] ?? null);
+const extraAssignees = computed(() => assignees.value.length - 1);
+
+const waiting = computed(() => {
+  const state = waitingState(props.task.waitingSince);
+  if (!state) return null;
+
+  return { ...state, classes: WAITING_CLASSES[state.level] };
+});
+
+const urgency = computed(() => {
+  const meta = URGENCY_META[props.task.priority];
   if (!meta) return null;
 
   return {
     ...meta,
-    classes: PRIORITY_CLASSES[meta.tone],
-    label: t(`FUNNEL.PRIORITY.${props.task.priority.toUpperCase()}`),
+    classes: URGENCY_CLASSES[meta.tone],
+    border: BORDER_CLASSES[meta.tone],
+    label: t(`FUNNEL.URGENCY.${props.task.priority.toUpperCase()}`),
   };
 });
-
-const labels = computed(() => props.task.labels ?? []);
-const visibleLabels = computed(() => labels.value.slice(0, MAX_VISIBLE_LABELS));
-const hiddenLabelCount = computed(
-  () => labels.value.length - visibleLabels.value.length
-);
-
-const assignees = computed(() => props.task.assignees ?? []);
-const visibleAssignees = computed(() =>
-  assignees.value.slice(0, MAX_VISIBLE_ASSIGNEES)
-);
-const hiddenAssigneeLabel = computed(
-  () => `+${assignees.value.length - visibleAssignees.value.length}`
-);
 
 const conversations = computed(() => props.task.conversations ?? []);
 
@@ -77,84 +118,9 @@ const primaryConversation = computed(
     null
 );
 
-const contact = computed(() => (props.task.contacts ?? [])[0] ?? null);
-
-// Conversa de grupo do WhatsApp chega com o id do grupo como titulo: dezoito digitos que nao
-// dizem nada a ninguem, com o nome util escondido na linha de baixo. Havendo contato, ele vira o
-// titulo. O id nao se perde — continua sendo o titulo do card quando aberto.
-const GROUP_ID_PATTERN = /^\d{12,}$/;
-
-const title = computed(() => {
-  const raw = props.task.title?.trim();
-  if (!raw) return t('FUNNEL.CARD.NO_TITLE');
-  const isGroupId = GROUP_ID_PATTERN.test(raw);
-  if (isGroupId && contact.value?.name) return contact.value.name;
-
-  return raw;
-});
-
-// O contato some quando repete o titulo, que e o caso mais comum: o card nascido de uma conversa
-// leva o nome do contato nos dois lugares e gastava duas linhas para dizer uma coisa so. O avatar
-// fica, porque e ele que carrega o icone do canal.
-const contactName = computed(() =>
-  contact.value && contact.value.name !== title.value ? contact.value.name : ''
-);
-
-// Quanto vale a oportunidade, na moeda do quadro. Vazio quando nao ha valor: "R$ 0" afirmaria
-// que nao vale nada, e o que se sabe e que ninguem precificou.
-const value = computed(() => {
-  const amount = Number(props.task.value);
-  if (!Number.isFinite(amount) || !amount) return '';
-
-  return formatMoney(amount, funnelStore.getActiveBoard?.currency || 'BRL');
-});
-
-// O ChannelIcon do core resolve o glifo a partir de channel_type, provider e medium — os tres
-// vem no payload por isso. Reusar significa que um canal novo no Chatwoot aparece aqui sozinho.
-const channelInbox = computed(() => {
-  const channel = props.task.channel;
-  if (!channel) return null;
-
-  return {
-    channel_type: channel.channelType,
-    provider: channel.provider,
-    medium: channel.medium,
-    name: channel.name,
-  };
-});
-
-const stepAge = computed(() => timeInStep(props.task.stepChangedAt));
-
-const due = computed(() => {
-  const state = dueState(props.task.dueAt);
-  if (!state) return null;
-
-  const date = new Date(props.task.dueAt);
-  const relative = {
-    [DUE_STATES.OVERDUE]: t('FUNNEL.CARD.OVERDUE'),
-    [DUE_STATES.TODAY]: t('FUNNEL.CARD.TODAY'),
-    [DUE_STATES.TOMORROW]: t('FUNNEL.CARD.TOMORROW'),
-  }[state];
-
-  return {
-    state,
-    classes: DUE_CLASSES[state],
-    isAlert: state !== DUE_STATES.FUTURE,
-    // Perto do prazo o quadro diz "Hoje"; longe dele a data exata informa mais que "em 12 dias".
-    label:
-      relative ??
-      date.toLocaleDateString(locale.value.replace('_', '-'), {
-        day: '2-digit',
-        month: 'short',
-      }),
-  };
-});
-
-const summary = computed(() => props.task.description?.trim() || '');
-
 // O corpo do card leva para a conversa, que e o que o agente quer na maioria das vezes; as
-// opcoes do card ficam na engrenagem. Sem conversa vinculada nao ha para onde navegar, entao
-// ali o corpo volta a abrir o card.
+// opcoes ficam no menu. Sem conversa vinculada nao ha para onde navegar, entao ali o corpo
+// volta a abrir o card.
 const activate = () => {
   if (primaryConversation.value) {
     emit('openConversation', primaryConversation.value);
@@ -162,6 +128,11 @@ const activate = () => {
   }
 
   emit('open', props.task);
+};
+
+const openConversation = () => {
+  if (primaryConversation.value)
+    emit('openConversation', primaryConversation.value);
 };
 
 const openLabel = computed(() =>
@@ -173,7 +144,8 @@ const openLabel = computed(() =>
 
 <template>
   <div
-    class="flex flex-col gap-2 p-3 border rounded-lg cursor-pointer select-none group bg-n-solid-1 border-n-weak hover:border-n-slate-6"
+    class="relative flex flex-col gap-2 p-3 border rounded-lg cursor-pointer select-none group bg-n-solid-1 border-n-weak hover:border-n-slate-6 hover:shadow-sm"
+    :class="urgency?.border"
     role="button"
     tabindex="0"
     :aria-label="openLabel"
@@ -181,11 +153,13 @@ const openLabel = computed(() =>
     @keydown.enter.prevent="activate"
     @keydown.space.prevent="activate"
   >
-    <!-- 1. titulo, com o responsavel a direita, como na referencia -->
-    <div class="flex items-start gap-2">
-      <span
-        class="text-sm font-semibold break-words grow text-n-slate-12 line-clamp-2"
-      >
+    <!-- 1. quem e e quanto vale.
+         A linha abre espaco a direita no hover: o botao de opcoes flutua sobre este canto e sem
+         isso cobriria justamente o valor, que e a metade mais importante da linha. -->
+    <div
+      class="flex items-start gap-2 transition-[padding] group-hover:ltr:pr-7 group-hover:rtl:pl-7"
+    >
+      <span class="text-sm font-semibold truncate grow text-n-slate-12">
         {{ title }}
       </span>
       <span
@@ -194,136 +168,104 @@ const openLabel = computed(() =>
       >
         {{ value }}
       </span>
-      <div
-        v-if="assignees.length"
-        class="flex items-center shrink-0 -space-x-1.5"
-      >
-        <Avatar
-          v-for="assignee in visibleAssignees"
-          :key="assignee.id"
-          :name="assignee.name"
-          :src="assignee.avatarUrl"
-          :size="20"
-          rounded-full
-          class="ring-1 ring-n-solid-1"
-        />
-        <span
-          v-if="assignees.length > visibleAssignees.length"
-          class="flex items-center justify-center text-xs rounded-full size-5 bg-n-slate-3 text-n-slate-11 ring-1 ring-n-solid-1"
-        >
-          {{ hiddenAssigneeLabel }}
-        </span>
-      </div>
-
-      <!-- Engrenagem: abre o card. O stop impede que o clique e as teclas cheguem ao corpo,
-           que navega para a conversa. -->
-      <button
-        type="button"
-        class="p-1 transition-opacity rounded opacity-0 shrink-0 text-n-slate-11 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-n-alpha-2"
-        :aria-label="t('FUNNEL.CARD.CONFIGURE')"
-        @click.stop="$emit('open', task)"
-        @keydown.stop
-      >
-        <Icon icon="i-lucide-settings" class="size-3.5" />
-      </button>
     </div>
 
-    <!-- 2. resumo -->
-    <p v-if="summary" class="text-xs text-n-slate-11 line-clamp-2">
-      {{ summary }}
+    <!-- 2. o que o cliente disse por ultimo -->
+    <p v-if="excerpt" class="text-xs text-n-slate-11 line-clamp-2">
+      {{ excerpt }}
     </p>
 
-    <!-- 3. contato e canal de origem: de onde este atendimento veio.
-         A linha so existe quando ha nome a mostrar. Esconder o contato repetido deixava um avatar
-         sozinho ocupando uma linha inteira — o card ficava MAIS espacoso, que e o oposto do que a
-         mudanca queria. Sem nome, o canal desce para o rodape, onde cabe num icone. -->
-    <div v-if="contactName" class="flex items-center gap-1.5">
-      <div v-if="contact" class="relative shrink-0">
-        <Avatar :name="contact.name" :size="20" rounded-full />
-        <ChannelIcon
-          v-if="channelInbox"
-          :inbox="channelInbox"
-          use-brand-icon
-          class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-n-solid-1"
-        />
-      </div>
-      <span class="text-xs truncate text-n-slate-11">
-        {{ contactName }}
+    <div class="h-px bg-n-weak" />
+
+    <!-- 3, 4 e 5: quem atende, ha quanto tempo o cliente espera, quao urgente e -->
+    <div class="flex items-center gap-1.5">
+      <Avatar
+        v-if="owner"
+        :name="owner.name"
+        :src="owner.avatarUrl"
+        :size="20"
+        rounded-full
+        class="shrink-0"
+      />
+      <!-- Card sem responsavel nao fica sem a linha: "ninguem esta atendendo" e uma resposta, e
+           e a que mais pede acao. O tracejado diz isso sem precisar de cor. -->
+      <span
+        v-else
+        class="flex items-center justify-center border border-dashed rounded-full size-5 shrink-0 border-n-strong text-n-slate-10"
+      >
+        <Icon icon="i-lucide-user-round" class="size-3" />
+      </span>
+      <span
+        class="text-xs truncate grow"
+        :class="owner ? 'text-n-slate-11' : 'text-n-slate-10'"
+      >
+        {{ owner ? owner.name : t('FUNNEL.CARD.UNASSIGNED') }}
+      </span>
+      <span v-if="extraAssignees > 0" class="text-xs shrink-0 text-n-slate-10">
+        {{ `+${extraAssignees}` }}
+      </span>
+
+      <span
+        v-if="waiting"
+        class="flex items-center gap-1 px-1.5 py-0.5 rounded shrink-0"
+        :class="waiting.classes"
+        :title="t('FUNNEL.CARD.WAITING_SINCE')"
+      >
+        <Icon icon="i-lucide-clock" class="size-3" />
+        <span class="text-xs font-medium tabular-nums">{{
+          waiting.label
+        }}</span>
+      </span>
+
+      <span
+        v-if="urgency"
+        class="flex items-center shrink-0"
+        :class="urgency.classes"
+        :title="urgency.label"
+        :aria-label="urgency.label"
+      >
+        <Icon :icon="urgency.icon" class="size-4" />
       </span>
     </div>
 
-    <!-- 4. etiquetas -->
-    <div v-if="labels.length" class="flex flex-wrap gap-1">
-      <span
-        v-for="label in visibleLabels"
-        :key="label.id"
-        class="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-n-alpha-2 text-n-slate-11"
+    <!-- Repouso mostra informacao, hover mostra acao: e isso que abriu espaco para as cinco
+         linhas acima. O stop impede que o clique chegue ao corpo, que navega para a conversa. -->
+    <OnClickOutside
+      class="absolute ltr:right-1.5 rtl:left-1.5 top-1.5"
+      @trigger="showMenu = false"
+    >
+      <button
+        type="button"
+        class="flex items-center justify-center transition-opacity border rounded-md size-6 border-n-weak bg-n-solid-2 text-n-slate-11 hover:text-n-slate-12"
+        :class="
+          showMenu
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+        "
+        :aria-label="t('FUNNEL.CARD.MENU.LABEL')"
+        :aria-expanded="showMenu"
+        @click.stop="showMenu = !showMenu"
+        @keydown.stop
       >
-        <span
-          class="size-2 rounded-sm shrink-0"
-          :style="{ backgroundColor: label.color }"
-        />
-        {{ label.title }}
-      </span>
-      <span
-        v-if="hiddenLabelCount > 0"
-        class="px-1.5 py-0.5 text-xs rounded bg-n-alpha-2 text-n-slate-11"
-      >
-        {{ `+${hiddenLabelCount}` }}
-      </span>
-    </div>
+        <Icon icon="i-lucide-ellipsis-vertical" class="size-3.5" />
+      </button>
 
-    <!-- 5. rodape de triagem: prioridade, vencimento, tempo na etapa, conversas -->
-    <div class="flex items-center gap-2">
-      <span
-        v-if="priority"
-        class="flex items-center gap-0.5 px-1 py-0.5 text-xs font-medium rounded shrink-0"
-        :class="priority.classes"
-        :title="priority.label"
-      >
-        <Icon :icon="priority.icon" class="size-3" />
-        {{ priority.label }}
-      </span>
-
-      <span
-        v-if="due"
-        class="flex items-center gap-1 px-1 py-0.5 text-xs rounded shrink-0"
-        :class="due.classes"
-      >
-        <Icon
-          :icon="due.isAlert ? 'i-lucide-alert-circle' : 'i-lucide-calendar'"
-          class="size-3"
-        />
-        {{ due.label }}
-      </span>
-
-      <div
-        class="flex items-center gap-2 text-xs ltr:ml-auto rtl:mr-auto text-n-slate-10"
-      >
-        <span
-          v-if="channelInbox && !contactName"
-          class="flex items-center"
-          :title="channelInbox.name"
-        >
-          <ChannelIcon :inbox="channelInbox" use-brand-icon class="size-3" />
-        </span>
-        <span
-          v-if="conversations.length"
-          class="flex items-center gap-1"
-          :title="t('FUNNEL.ASSOCIATIONS.CONVERSATIONS')"
-        >
-          <Icon icon="i-lucide-message-square" class="size-3" />
-          {{ conversations.length }}
-        </span>
-        <span
-          v-if="stepAge"
-          class="flex items-center gap-1"
-          :title="t('FUNNEL.CARD.TIME_IN_STEP')"
-        >
-          <Icon icon="i-lucide-clock" class="size-3" />
-          {{ stepAge }}
-        </span>
-      </div>
-    </div>
+      <FunnelCardMenu
+        v-if="showMenu"
+        :task="task"
+        :steps="steps"
+        :has-conversation="Boolean(primaryConversation)"
+        :can-archive="canArchive"
+        @click.stop
+        @keydown.stop
+        @edit="$emit('open', task)"
+        @open-conversation="openConversation"
+        @move="$emit('move', $event)"
+        @assign="$emit('assign', $event)"
+        @set-urgency="$emit('setUrgency', $event)"
+        @archive="$emit('archive', task)"
+        @close="showMenu = false"
+      />
+    </OnClickOutside>
   </div>
 </template>

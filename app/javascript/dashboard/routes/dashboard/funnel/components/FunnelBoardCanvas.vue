@@ -12,6 +12,7 @@ const props = defineProps({
   tasksByStep: { type: Object, default: () => ({}) },
   canEdit: { type: Boolean, default: false },
   canManageSteps: { type: Boolean, default: false },
+  canArchive: { type: Boolean, default: false },
   canReorder: { type: Boolean, default: true },
 });
 
@@ -22,6 +23,12 @@ const emit = defineEmits([
   'openConversation',
   'configureStep',
   'addStep',
+  'reorderSteps',
+  'deleteStep',
+  'moveTask',
+  'assignTask',
+  'setTaskUrgency',
+  'archiveTask',
 ]);
 
 const { t } = useI18n();
@@ -52,6 +59,18 @@ const onStepDragEnd = () =>
     'reorderSteps',
     localSteps.value.map(step => step.id)
   );
+
+// Mover a etapa pelo menu e a mesma reordenacao do arrasto, so que com um passo: troca de
+// lugar com a vizinha e manda a fileira inteira, como o onStepDragEnd faz.
+const onMoveStep = ({ step, direction }) => {
+  const order = localSteps.value.map(item => item.id);
+  const index = order.indexOf(step.id);
+  const target = index + direction;
+  if (index === -1 || target < 0 || target >= order.length) return;
+
+  [order[index], order[target]] = [order[target], order[index]];
+  emit('reorderSteps', order);
+};
 
 const onColumnChange = ({ stepId, event }) => {
   // `removed` chega na coluna de origem depois de `added` na de destino: tratar os dois
@@ -84,15 +103,25 @@ const onColumnChange = ({ stepId, event }) => {
       <template #item="{ element }">
         <FunnelColumn
           :step="element"
+          :steps="steps"
           :tasks="columns[element.id] ?? []"
           :can-edit="canEdit"
           :can-drag="canEdit && canReorder"
           :can-manage-steps="canManageSteps"
+          :can-archive="canArchive"
+          :is-first="steps[0]?.id === element.id"
+          :is-last="steps[steps.length - 1]?.id === element.id"
           @change="onColumnChange"
           @add-card="$emit('addCard', $event)"
           @open-task="$emit('openTask', $event)"
           @open-conversation="$emit('openConversation', $event)"
           @configure="$emit('configureStep', $event)"
+          @move-step="onMoveStep"
+          @delete-step="$emit('deleteStep', $event)"
+          @move-task="$emit('moveTask', $event)"
+          @assign-task="$emit('assignTask', $event)"
+          @set-task-urgency="$emit('setTaskUrgency', $event)"
+          @archive-task="$emit('archiveTask', $event)"
         />
       </template>
     </Draggable>

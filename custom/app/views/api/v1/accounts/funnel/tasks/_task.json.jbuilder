@@ -54,3 +54,13 @@ if primary_inbox.present?
 else
   json.channel nil
 end
+
+# Ha quanto tempo o CLIENTE espera resposta, que nao e ha quanto tempo o card esta na etapa.
+# Sao perguntas diferentes e o quadro precisava da primeira: um card pode estar tres dias em
+# "Proposta enviada" sem ninguem devendo nada, e outro dez minutos na mesma etapa com o cliente
+# no vacuo. O Chatwoot ja gravava waiting_since em toda conversa; o funil e que nunca leu.
+json.waiting_since primary_conversation&.waiting_since
+
+# O que o cliente disse por ultimo. Sem conversa vinculada — card criado a mao na coluna — cai
+# para a descricao, que e o unico texto que esse card tem.
+json.excerpt funnel_conversation_preview(primary_conversation).presence || task.description

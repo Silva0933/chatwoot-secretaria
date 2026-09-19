@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { debounce } from '@chatwoot/utils';
+import { OnClickOutside } from '@vueuse/components';
 
 import { useMapGetter } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
@@ -10,6 +11,7 @@ import {
   SORT_OPTIONS,
   TASK_PRIORITIES,
   DUE_FILTERS,
+  WAITING_FILTERS,
   EMPTY_FILTERS,
 } from 'dashboard/helper/funnelHelper';
 
@@ -29,24 +31,12 @@ const searchInput = ref(funnelStore.filters.search);
 const attributeKey = ref(funnelStore.filters.attributeKey);
 const attributeValue = ref(funnelStore.filters.attributeValue);
 
-// Filtrar por atributo e uso raro, e os dois campos ocupavam uma linha inteira acima do primeiro
-// card, sempre, em todo carregamento do quadro. Ficam atras de um botao — e abrem sozinhos quando
-// ha filtro ativo, porque uma visao salva que filtre por atributo nao pode restaurar um filtro
-// que o operador nao consegue ver nem limpar.
-const showAttributeFilter = ref(Boolean(funnelStore.filters.attributeKey));
+// Seis selects abertos ocupavam uma linha inteira acima do primeiro card em todo carregamento do
+// quadro, e cinco deles estavam em "qualquer" na quase totalidade do tempo. Agora ficam atras de
+// um botao que diz quantos estao ligados — e os chips abaixo dizem quais, para nao esconder
+// filtro ativo atras de um painel fechado.
+const showFilters = ref(false);
 
-const attributeFilterIcon = computed(() =>
-  showAttributeFilter.value
-    ? 'i-lucide-chevron-up'
-    : 'i-lucide-sliders-horizontal'
-);
-
-watch(
-  () => funnelStore.filters.attributeKey,
-  key => {
-    if (key) showAttributeFilter.value = true;
-  }
-);
 const viewName = ref('');
 const showSaveView = ref(false);
 
@@ -103,6 +93,16 @@ const dueOptions = computed(() =>
       label: t(`FUNNEL.FILTERS.DUE.${value.toUpperCase()}`),
     })),
     t('FUNNEL.FILTERS.ANY_DUE')
+  )
+);
+
+const waitingOptions = computed(() =>
+  withAnyOption(
+    WAITING_FILTERS.map(value => ({
+      value,
+      label: t(`FUNNEL.FILTERS.WAITING.${value.toUpperCase()}`),
+    })),
+    t('FUNNEL.FILTERS.ANY_WAITING')
   )
 );
 
@@ -164,6 +164,14 @@ const activeChips = computed(() => {
       label: named(dueOptions.value, filters.value.due) ?? filters.value.due,
     });
   }
+  if (filters.value.waiting) {
+    chips.push({
+      key: 'waiting',
+      label:
+        named(waitingOptions.value, filters.value.waiting) ??
+        filters.value.waiting,
+    });
+  }
   if (filters.value.attributeKey) {
     chips.push({
       key: 'attributeKey',
@@ -175,6 +183,12 @@ const activeChips = computed(() => {
 
   return chips;
 });
+
+// A busca tem campo proprio na barra, entao o contador do botao conta so o que esta atras dele:
+// somar a busca faria o botao dizer "1" com o painel inteiro em "qualquer".
+const filterCount = computed(
+  () => activeChips.value.filter(chip => chip.key !== 'search').length
+);
 
 const setFilter = (key, value) => funnelStore.setFilters({ [key]: value });
 
@@ -225,7 +239,7 @@ const applyView = view => {
   attributeKey.value = view.filters?.attributeKey ?? '';
   attributeValue.value = view.filters?.attributeValue ?? '';
   funnelStore.setFilters({ ...EMPTY_FILTERS, ...view.filters });
-  funnelStore.setSortBy(view.sortBy ?? 'position');
+  funnelStore.setSortBy(view.sortBy ?? 'waiting');
 };
 
 const removeView = name =>
@@ -252,142 +266,209 @@ watch(
 <template>
   <div class="flex flex-col gap-2 px-6 pb-3">
     <div class="flex flex-wrap items-center gap-2">
-      <Input
-        v-model="searchInput"
-        class="w-56"
-        :placeholder="t('FUNNEL.FILTERS.SEARCH_PLACEHOLDER')"
-        :aria-label="t('FUNNEL.FILTERS.SEARCH_PLACEHOLDER')"
-      />
-
-      <Select
-        :model-value="filters.assigneeId"
-        :options="agentOptions"
-        :aria-label="t('FUNNEL.FILTERS.ANY_AGENT')"
-        class="w-40"
-        @update:model-value="value => setFilter('assigneeId', value)"
-      />
-
-      <Select
-        :model-value="filters.inboxId"
-        :options="inboxOptions"
-        :aria-label="t('FUNNEL.FILTERS.ANY_INBOX')"
-        class="w-40"
-        @update:model-value="value => setFilter('inboxId', value)"
-      />
-
-      <Select
-        :model-value="filters.priority"
-        :options="priorityOptions"
-        :aria-label="t('FUNNEL.FILTERS.ANY_PRIORITY')"
-        class="w-36"
-        @update:model-value="value => setFilter('priority', value)"
-      />
-
-      <Select
-        :model-value="filters.labelId"
-        :options="labelOptions"
-        :aria-label="t('FUNNEL.FILTERS.ANY_LABEL')"
-        class="w-36"
-        @update:model-value="value => setFilter('labelId', value)"
-      />
-
-      <Select
-        :model-value="filters.due"
-        :options="dueOptions"
-        :aria-label="t('FUNNEL.FILTERS.ANY_DUE')"
-        class="w-36"
-        @update:model-value="value => setFilter('due', value)"
-      />
-
-      <div class="flex items-center gap-1.5 ltr:ml-auto rtl:mr-auto">
-        <Icon icon="i-lucide-arrow-up-down" class="size-4 text-n-slate-11" />
-        <Select
-          :model-value="funnelStore.sortBy"
-          :options="sortOptions"
-          :aria-label="t('FUNNEL.SORT.LABEL')"
-          class="w-44"
-          @update:model-value="value => funnelStore.setSortBy(value)"
+      <div class="relative w-72">
+        <Icon
+          icon="i-lucide-search"
+          class="absolute top-2.5 size-4 text-n-slate-10 ltr:left-3 rtl:right-3"
+        />
+        <Input
+          v-model="searchInput"
+          custom-input-class="ltr:pl-9 rtl:pr-9"
+          :placeholder="t('FUNNEL.FILTERS.SEARCH_PLACEHOLDER')"
+          :aria-label="t('FUNNEL.FILTERS.SEARCH_PLACEHOLDER')"
         />
       </div>
-    </div>
 
-    <div class="flex flex-wrap items-center gap-2">
-      <Button
-        variant="ghost"
-        color="slate"
-        size="xs"
-        :icon="attributeFilterIcon"
-        :label="t('FUNNEL.FILTERS.MORE')"
-        type="button"
-        :aria-expanded="showAttributeFilter"
-        @click="showAttributeFilter = !showAttributeFilter"
-      />
-      <Input
-        v-if="showAttributeFilter"
-        v-model="attributeKey"
-        class="w-44"
-        :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
-        :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
-      />
-      <Input
-        v-if="showAttributeFilter"
-        v-model="attributeValue"
-        class="w-44"
-        :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
-        :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
-      />
-
-      <span
-        v-for="view in savedViews"
-        :key="view.name"
-        class="flex items-center gap-1 py-0.5 ltr:pl-2 ltr:pr-1 rtl:pr-2 rtl:pl-1 text-xs rounded-md bg-n-alpha-2 text-n-slate-12"
-      >
-        <button type="button" class="hover:underline" @click="applyView(view)">
-          {{ view.name }}
-        </button>
+      <OnClickOutside class="relative" @trigger="showFilters = false">
         <Button
-          variant="ghost"
+          :variant="showFilters || filterCount ? 'faded' : 'ghost'"
           color="slate"
-          size="xs"
-          icon="i-lucide-x"
-          :aria-label="t('FUNNEL.FILTERS.REMOVE_VIEW')"
-          @click="removeView(view.name)"
-        />
-      </span>
+          size="sm"
+          icon="i-lucide-list-filter"
+          type="button"
+          :aria-expanded="showFilters"
+          @click="showFilters = !showFilters"
+        >
+          <span class="min-w-0 truncate">{{ t('FUNNEL.FILTERS.BUTTON') }}</span>
+          <span
+            v-if="filterCount"
+            class="flex items-center justify-center px-1.5 text-xs font-medium rounded-full h-[18px] min-w-[18px] bg-n-blue-9 text-white"
+          >
+            {{ filterCount }}
+          </span>
+        </Button>
 
-      <template v-if="showSaveView">
-        <Input
-          v-model="viewName"
-          class="w-40"
-          :placeholder="t('FUNNEL.FILTERS.VIEW_NAME')"
-          :aria-label="t('FUNNEL.FILTERS.VIEW_NAME')"
-          @keydown.enter.prevent="saveView"
-        />
-        <Button
-          variant="faded"
-          color="slate"
-          size="xs"
-          :label="t('FUNNEL.FILTERS.SAVE_VIEW')"
-          :disabled="!viewName.trim()"
-          @click="saveView"
-        />
-      </template>
-      <Button
-        v-else-if="hasFilters"
-        variant="link"
-        color="slate"
-        size="xs"
-        icon="i-lucide-bookmark"
-        :label="t('FUNNEL.FILTERS.SAVE_VIEW')"
-        @click="showSaveView = true"
-      />
-    </div>
+        <!-- O painel guarda os seis seletores que antes moravam na barra. Abre por cima do
+             quadro e nao empurra as colunas para baixo: mexer no filtro nao deve mover o card
+             que se estava olhando. -->
+        <div
+          v-if="showFilters"
+          class="absolute z-50 flex flex-col gap-3 p-4 border shadow-lg w-80 top-10 ltr:left-0 rtl:right-0 rounded-xl bg-n-solid-2 border-n-weak"
+        >
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.WAITING_LABEL') }}
+            </span>
+            <Select
+              :model-value="filters.waiting"
+              :options="waitingOptions"
+              :aria-label="t('FUNNEL.FILTERS.WAITING_LABEL')"
+              @update:model-value="value => setFilter('waiting', value)"
+            />
+          </label>
 
-    <div v-if="hasFilters" class="flex flex-wrap items-center gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.AGENT_LABEL') }}
+            </span>
+            <Select
+              :model-value="filters.assigneeId"
+              :options="agentOptions"
+              :aria-label="t('FUNNEL.FILTERS.AGENT_LABEL')"
+              @update:model-value="value => setFilter('assigneeId', value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.INBOX_LABEL') }}
+            </span>
+            <Select
+              :model-value="filters.inboxId"
+              :options="inboxOptions"
+              :aria-label="t('FUNNEL.FILTERS.INBOX_LABEL')"
+              @update:model-value="value => setFilter('inboxId', value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.PRIORITY_LABEL') }}
+            </span>
+            <Select
+              :model-value="filters.priority"
+              :options="priorityOptions"
+              :aria-label="t('FUNNEL.FILTERS.PRIORITY_LABEL')"
+              @update:model-value="value => setFilter('priority', value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.LABEL_LABEL') }}
+            </span>
+            <Select
+              :model-value="filters.labelId"
+              :options="labelOptions"
+              :aria-label="t('FUNNEL.FILTERS.LABEL_LABEL')"
+              @update:model-value="value => setFilter('labelId', value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.DUE_LABEL') }}
+            </span>
+            <Select
+              :model-value="filters.due"
+              :options="dueOptions"
+              :aria-label="t('FUNNEL.FILTERS.DUE_LABEL')"
+              @update:model-value="value => setFilter('due', value)"
+            />
+          </label>
+
+          <div class="h-px bg-n-weak" />
+
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-medium text-n-slate-11">
+              {{ t('FUNNEL.FILTERS.ATTRIBUTE_LABEL') }}
+            </span>
+            <div class="flex gap-2">
+              <Input
+                v-model="attributeKey"
+                class="grow"
+                :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
+                :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
+              />
+              <Input
+                v-model="attributeValue"
+                class="grow"
+                :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
+                :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
+              />
+            </div>
+          </div>
+
+          <div v-if="savedViews.length" class="flex flex-wrap gap-1.5">
+            <span
+              v-for="view in savedViews"
+              :key="view.name"
+              class="flex items-center gap-1 py-0.5 ltr:pl-2 ltr:pr-1 rtl:pr-2 rtl:pl-1 text-xs rounded-md bg-n-alpha-2 text-n-slate-12"
+            >
+              <button
+                type="button"
+                class="hover:underline"
+                @click="applyView(view)"
+              >
+                {{ view.name }}
+              </button>
+              <Button
+                variant="ghost"
+                color="slate"
+                size="xs"
+                icon="i-lucide-x"
+                :aria-label="t('FUNNEL.FILTERS.REMOVE_VIEW')"
+                @click="removeView(view.name)"
+              />
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <template v-if="showSaveView">
+              <Input
+                v-model="viewName"
+                class="grow"
+                :placeholder="t('FUNNEL.FILTERS.VIEW_NAME')"
+                :aria-label="t('FUNNEL.FILTERS.VIEW_NAME')"
+                @keydown.enter.prevent="saveView"
+              />
+              <Button
+                variant="faded"
+                color="slate"
+                size="xs"
+                :label="t('FUNNEL.FILTERS.SAVE_VIEW')"
+                :disabled="!viewName.trim()"
+                @click="saveView"
+              />
+            </template>
+            <Button
+              v-else-if="hasFilters"
+              variant="link"
+              color="slate"
+              size="xs"
+              icon="i-lucide-bookmark"
+              :label="t('FUNNEL.FILTERS.SAVE_VIEW')"
+              @click="showSaveView = true"
+            />
+            <div class="grow" />
+            <Button
+              v-if="hasFilters"
+              variant="link"
+              color="slate"
+              size="xs"
+              :label="t('FUNNEL.FILTERS.CLEAR_ALL')"
+              @click="clearAll"
+            />
+          </div>
+        </div>
+      </OnClickOutside>
+
+      <!-- Os chips ficam na barra, e nao dentro do painel: filtro ativo que so aparece depois de
+           abrir um menu e filtro que o operador esquece que ligou. -->
       <span
         v-for="chip in activeChips"
         :key="chip.key"
-        class="flex items-center gap-1 py-0.5 ltr:pl-2 ltr:pr-1 rtl:pr-2 rtl:pl-1 text-xs rounded-md bg-n-alpha-2 text-n-slate-12"
+        class="flex items-center gap-1 py-0.5 ltr:pl-2.5 ltr:pr-1 rtl:pr-2.5 rtl:pl-1 text-xs rounded-full bg-n-alpha-2 text-n-slate-12"
       >
         {{ chip.label }}
         <Button
@@ -400,17 +481,9 @@ watch(
         />
       </span>
 
-      <Button
-        variant="link"
-        color="slate"
-        size="xs"
-        :label="t('FUNNEL.FILTERS.CLEAR_ALL')"
-        @click="clearAll"
-      />
-
       <!-- O contador diz quanto o filtro escondeu: sem ele, uma coluna vazia parece um quadro
            vazio, e o relatorio pede que os contadores respeitem exatamente o filtro. -->
-      <span class="text-xs ltr:ml-auto rtl:mr-auto text-n-slate-10">
+      <span v-if="hasFilters" class="text-xs text-n-slate-10">
         {{
           t('FUNNEL.FILTERS.SHOWING', {
             visible: visibleCount,
@@ -418,6 +491,19 @@ watch(
           })
         }}
       </span>
+
+      <div class="grow" />
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <Icon icon="i-lucide-arrow-up-down" class="size-4 text-n-slate-10" />
+        <Select
+          :model-value="funnelStore.sortBy"
+          :options="sortOptions"
+          :aria-label="t('FUNNEL.SORT.LABEL')"
+          class="w-44"
+          @update:model-value="value => funnelStore.setSortBy(value)"
+        />
+      </div>
     </div>
   </div>
 </template>
