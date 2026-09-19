@@ -103,8 +103,10 @@ jobs:
         # reprovando por erro pre-existente em arquivo que este modulo nao toca.
         run: pnpm exec eslint 'app/javascript/dashboard/routes/dashboard/funnel/**/*.vue' app/javascript/dashboard/stores/funnel.js app/javascript/dashboard/helper/funnelHelper.js
 
+      # Os specs de componente entram junto: o crash do dialogo de configuracoes do quadro
+      # (membro escolhido derrubava a tela inteira) nao aparecia em nenhum teste de helper.
       - name: Run the funnel frontend tests
-        run: pnpm test app/javascript/dashboard/helper/specs/funnelHelper.spec.js
+        run: pnpm test app/javascript/dashboard/helper/specs/funnelHelper.spec.js app/javascript/dashboard/routes/dashboard/funnel
 
       - name: Create database
         run: bundle exec rake db:create
