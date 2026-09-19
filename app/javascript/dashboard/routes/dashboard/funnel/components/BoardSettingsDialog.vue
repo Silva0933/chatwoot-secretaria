@@ -84,13 +84,26 @@ const syncFromBoard = () => {
   });
 };
 
-// Agente recem-marcado ainda nao tem papel: entra como member com visao total, que e o caso
-// comum, e o operador ajusta se quiser restringir.
-watch(memberIds, ids => {
+/**
+ * Agente recem-marcado ainda nao tem papel: entra como member com visao total, que e o caso
+ * comum, e o operador ajusta se quiser restringir.
+ *
+ * Preenchido AQUI, antes de `memberIds` receber o id novo, e nao num watch. O
+ * TagMultiSelectComboBox guarda `ref(props.modelValue)` — a MESMA instancia do array deste
+ * componente — da push nela e emite a propria referencia de volta. Como a identidade do
+ * `.value` nao muda, um `watch(memberIds)` nunca dispara; mas a mutacao do array e rastreada e
+ * redesenha a lista. O template chegava em `roles[id].role` com `roles[id]` ainda indefinido e
+ * derrubava o dialogo inteiro com "Cannot read properties of undefined (reading 'role')".
+ *
+ * A copia com spread tambem desfaz esse compartilhamento: a partir daqui pai e filho deixam de
+ * escrever no mesmo array.
+ */
+const onMembersChange = ids => {
   ids.forEach(id => {
     roles[id] ||= { role: 'member', visibilityScope: 'all_tasks' };
   });
-});
+  memberIds.value = [...ids];
+};
 
 // So sincroniza com o quadro enquanto o dialogo esta fechado. Cada uma das tres gravacoes abaixo
 // devolve o quadro inteiro e mexe no store, o que dispara este watch: sem a trava, a resposta da
@@ -197,12 +210,13 @@ defineExpose({ open, close });
           {{ t('FUNNEL.SETTINGS.MEMBERS_HINT') }}
         </p>
         <TagMultiSelectComboBox
-          v-model="memberIds"
+          :model-value="memberIds"
           :options="agentOptions"
           :disabled="isSaving"
           :placeholder="t('FUNNEL.SETTINGS.MEMBERS_PLACEHOLDER')"
           :search-placeholder="t('FUNNEL.ASSOCIATIONS.SEARCH')"
           :empty-state="t('FUNNEL.ASSOCIATIONS.NO_AGENTS')"
+          @update:model-value="onMembersChange"
         />
 
         <ul v-if="memberIds.length" class="flex flex-col gap-2 mt-1">

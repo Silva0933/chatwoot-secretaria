@@ -4,11 +4,14 @@ import { useI18n } from 'vue-i18n';
 import { OnClickOutside } from '@vueuse/components';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import FunnelCardMenu from './FunnelCardMenu.vue';
 import {
   waitingState,
+  dueState,
   formatMoney,
+  DUE_STATES,
   URGENCY_META,
   WAITING_LEVELS,
 } from 'dashboard/helper/funnelHelper';
@@ -55,7 +58,50 @@ const BORDER_CLASSES = {
   ruby: 'ltr:border-l-2 rtl:border-r-2 border-l-n-ruby-9 rtl:border-r-n-ruby-9',
 };
 
+// O prazo so aparece quando pede acao: atrasado ou vencendo hoje. Um card que vence em doze
+// dias nao muda o que alguem faz agora, e um selo de data em todo card devolveria exatamente o
+// ruido que o redesenho tirou. As outras datas continuam no dialogo do card.
+const DUE_CLASSES = {
+  [DUE_STATES.OVERDUE]: 'bg-n-ruby-3 text-n-ruby-11',
+  [DUE_STATES.TODAY]: 'bg-n-amber-3 text-n-amber-11',
+};
+
+const MAX_VISIBLE_LABELS = 3;
+
 const contact = computed(() => (props.task.contacts ?? [])[0] ?? null);
+
+const labels = computed(() => props.task.labels ?? []);
+const visibleLabels = computed(() => labels.value.slice(0, MAX_VISIBLE_LABELS));
+const hiddenLabelCount = computed(
+  () => labels.value.length - visibleLabels.value.length
+);
+
+const due = computed(() => {
+  const state = dueState(props.task.dueAt);
+  if (state !== DUE_STATES.OVERDUE && state !== DUE_STATES.TODAY) return null;
+
+  return {
+    classes: DUE_CLASSES[state],
+    label:
+      state === DUE_STATES.OVERDUE
+        ? t('FUNNEL.CARD.OVERDUE')
+        : t('FUNNEL.CARD.TODAY'),
+  };
+});
+
+// O ChannelIcon do core resolve o glifo a partir de channel_type, provider e medium — os tres
+// vem no payload por isso. Reusar significa que um canal novo no Chatwoot aparece aqui sozinho.
+const channelInbox = computed(() => {
+  const channel = props.task.channel;
+  if (!channel) return null;
+
+  return {
+    channel_type: channel.channelType,
+    provider: channel.provider,
+    medium: channel.medium,
+    name: channel.name,
+  };
+});
 
 // Conversa de grupo do WhatsApp chega com o id do grupo como titulo: dezoito digitos que nao
 // dizem nada a ninguem. Havendo contato, ele vira o titulo. O id nao se perde — continua sendo o
@@ -175,6 +221,28 @@ const openLabel = computed(() =>
       {{ excerpt }}
     </p>
 
+    <!-- Etiquetas, quando ha. Ficam acima do divisor porque descrevem o card, nao o estado do
+         atendimento — que e o que a linha de baixo responde. -->
+    <div v-if="labels.length" class="flex flex-wrap gap-1">
+      <span
+        v-for="label in visibleLabels"
+        :key="label.id"
+        class="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-n-alpha-2 text-n-slate-11"
+      >
+        <span
+          class="rounded-sm size-2 shrink-0"
+          :style="{ backgroundColor: label.color }"
+        />
+        {{ label.title }}
+      </span>
+      <span
+        v-if="hiddenLabelCount > 0"
+        class="px-1.5 py-0.5 text-xs rounded bg-n-alpha-2 text-n-slate-11"
+      >
+        {{ `+${hiddenLabelCount}` }}
+      </span>
+    </div>
+
     <div class="h-px bg-n-weak" />
 
     <!-- 3, 4 e 5: quem atende, ha quanto tempo o cliente espera, quao urgente e -->
@@ -203,6 +271,34 @@ const openLabel = computed(() =>
       </span>
       <span v-if="extraAssignees > 0" class="text-xs shrink-0 text-n-slate-10">
         {{ `+${extraAssignees}` }}
+      </span>
+
+      <!-- Canal e numero de conversas em cinza, sem fundo: sao procedencia, nao alarme. O que
+           pede acao nesta linha e o que vem depois deles, colorido. -->
+      <span
+        v-if="channelInbox"
+        class="flex items-center shrink-0 text-n-slate-10"
+        :title="channelInbox.name"
+      >
+        <ChannelIcon :inbox="channelInbox" use-brand-icon class="size-3.5" />
+      </span>
+
+      <span
+        v-if="conversations.length"
+        class="flex items-center gap-1 text-xs shrink-0 text-n-slate-10"
+        :title="t('FUNNEL.ASSOCIATIONS.CONVERSATIONS')"
+      >
+        <Icon icon="i-lucide-message-square" class="size-3" />
+        {{ conversations.length }}
+      </span>
+
+      <span
+        v-if="due"
+        class="flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded shrink-0"
+        :class="due.classes"
+      >
+        <Icon icon="i-lucide-alert-circle" class="size-3" />
+        {{ due.label }}
       </span>
 
       <span
