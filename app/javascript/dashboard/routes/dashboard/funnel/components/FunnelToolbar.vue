@@ -35,6 +35,12 @@ const attributeValue = ref(funnelStore.filters.attributeValue);
 // que o operador nao consegue ver nem limpar.
 const showAttributeFilter = ref(Boolean(funnelStore.filters.attributeKey));
 
+const attributeFilterIcon = computed(() =>
+  showAttributeFilter.value
+    ? 'i-lucide-chevron-up'
+    : 'i-lucide-sliders-horizontal'
+);
+
 watch(
   () => funnelStore.filters.attributeKey,
   key => {
@@ -310,9 +316,7 @@ watch(
         variant="ghost"
         color="slate"
         size="xs"
-        :icon="
-          showAttributeFilter ? 'i-lucide-chevron-up' : 'i-lucide-sliders-horizontal'
-        "
+        :icon="attributeFilterIcon"
         :label="t('FUNNEL.FILTERS.MORE')"
         type="button"
         :aria-expanded="showAttributeFilter"
