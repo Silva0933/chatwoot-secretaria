@@ -4,6 +4,10 @@ import { useStore, useStoreGetters } from 'dashboard/composables/store';
 export const DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER = Object.freeze([
   { name: 'scheduled_messages' },
   { name: 'conversation_actions' },
+  // Logo apos as acoes da conversa, e nao em decimo lugar: o funil estava abaixo de nove
+  // acordeoes, colapsado, no unico lugar onde o atendente passa o dia. Quem ja arrastou a
+  // propria ordem mantem a dele — esta lista so vale para quem nunca mexeu.
+  { name: 'funnel' },
   { name: 'macros' },
   { name: 'conversation_info' },
   { name: 'contact_attributes' },
@@ -11,7 +15,6 @@ export const DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER = Object.freeze([
   { name: 'shared_files' },
   { name: 'previous_conversation' },
   { name: 'conversation_participants' },
-  { name: 'funnel' },
   { name: 'linear_issues' },
   { name: 'shopify_orders' },
 ]);

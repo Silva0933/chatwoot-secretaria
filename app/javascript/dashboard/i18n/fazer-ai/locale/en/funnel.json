@@ -202,6 +202,7 @@
       },
       "ATTRIBUTE_KEY": "Attribute",
       "ATTRIBUTE_VALUE": "Attribute value",
+      "MORE": "More filters",
       "SAVE_VIEW": "Save view",
       "VIEW_NAME": "View name",
       "REMOVE_VIEW": "Remove view"

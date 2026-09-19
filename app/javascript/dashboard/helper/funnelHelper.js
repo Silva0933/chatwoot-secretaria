@@ -365,7 +365,10 @@ export const STEP_COLORS = [
 
 export const DEFAULT_STEP_COLOR = STEP_COLORS[2].value;
 
-export const BOARD_TEMPLATES = ['clinic', 'blank'];
+// 'blank' primeiro e como padrao: 'clinic' e heranca da origem da fazer.ai e traz oito etapas
+// de jornada de paciente, que nao descrevem a maioria das contas. Quem quer a de clinica
+// escolhe; quem nao quer nao precisa apagar oito etapas para comecar.
+export const BOARD_TEMPLATES = ['blank', 'clinic'];
 
 export const BOARD_MEMBER_ROLES = ['manager', 'member', 'viewer'];
 

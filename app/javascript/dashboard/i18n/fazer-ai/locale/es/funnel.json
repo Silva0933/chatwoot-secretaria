@@ -202,6 +202,7 @@
       },
       "ATTRIBUTE_KEY": "Atributo",
       "ATTRIBUTE_VALUE": "Valor del atributo",
+      "MORE": "Más filtros",
       "SAVE_VIEW": "Guardar vista",
       "VIEW_NAME": "Nombre de la vista",
       "REMOVE_VIEW": "Quitar vista"

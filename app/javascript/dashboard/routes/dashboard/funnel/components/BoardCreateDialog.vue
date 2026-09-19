@@ -17,7 +17,7 @@ const emit = defineEmits(['create']);
 const { t } = useI18n();
 
 const dialogRef = ref(null);
-const form = reactive({ name: '', description: '', template: 'clinic' });
+const form = reactive({ name: '', description: '', template: 'blank' });
 
 const templateOptions = computed(() =>
   BOARD_TEMPLATES.map(template => ({
@@ -31,7 +31,7 @@ const isInvalid = computed(() => !form.name.trim());
 const resetForm = () => {
   form.name = '';
   form.description = '';
-  form.template = 'clinic';
+  form.template = 'blank';
 };
 
 const open = () => {

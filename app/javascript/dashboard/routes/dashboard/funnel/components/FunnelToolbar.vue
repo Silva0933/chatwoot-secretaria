@@ -28,6 +28,19 @@ const inboxes = useMapGetter('inboxes/getInboxes');
 const searchInput = ref(funnelStore.filters.search);
 const attributeKey = ref(funnelStore.filters.attributeKey);
 const attributeValue = ref(funnelStore.filters.attributeValue);
+
+// Filtrar por atributo e uso raro, e os dois campos ocupavam uma linha inteira acima do primeiro
+// card, sempre, em todo carregamento do quadro. Ficam atras de um botao — e abrem sozinhos quando
+// ha filtro ativo, porque uma visao salva que filtre por atributo nao pode restaurar um filtro
+// que o operador nao consegue ver nem limpar.
+const showAttributeFilter = ref(Boolean(funnelStore.filters.attributeKey));
+
+watch(
+  () => funnelStore.filters.attributeKey,
+  key => {
+    if (key) showAttributeFilter.value = true;
+  }
+);
 const viewName = ref('');
 const showSaveView = ref(false);
 
@@ -293,13 +306,27 @@ watch(
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
+      <Button
+        variant="ghost"
+        color="slate"
+        size="xs"
+        :icon="
+          showAttributeFilter ? 'i-lucide-chevron-up' : 'i-lucide-sliders-horizontal'
+        "
+        :label="t('FUNNEL.FILTERS.MORE')"
+        type="button"
+        :aria-expanded="showAttributeFilter"
+        @click="showAttributeFilter = !showAttributeFilter"
+      />
       <Input
+        v-if="showAttributeFilter"
         v-model="attributeKey"
         class="w-44"
         :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
         :aria-label="t('FUNNEL.FILTERS.ATTRIBUTE_KEY')"
       />
       <Input
+        v-if="showAttributeFilter"
         v-model="attributeValue"
         class="w-44"
         :placeholder="t('FUNNEL.FILTERS.ATTRIBUTE_VALUE')"
