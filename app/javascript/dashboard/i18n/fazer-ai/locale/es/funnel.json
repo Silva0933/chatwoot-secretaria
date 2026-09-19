@@ -147,6 +147,14 @@
       "NAME_LABEL": "Nombre",
       "NAME_PLACEHOLDER": "Ej.: Esperando examen",
       "COLOR_LABEL": "Color",
+      "COLORS": {
+        "SLATE": "Pizarra",
+        "RED": "Rojo",
+        "BLUE": "Azul",
+        "AMBER": "Ámbar",
+        "PINK": "Rosa",
+        "GREEN": "Verde"
+      },
       "TYPE_LABEL": "Tipo de etapa",
       "TYPE_HINT": "Ganado y Perdido cierran la tarjeta; En curso la mantiene en el embudo.",
       "SAVE": "Guardar",

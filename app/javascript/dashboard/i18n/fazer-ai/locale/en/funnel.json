@@ -147,6 +147,14 @@
       "NAME_LABEL": "Name",
       "NAME_PLACEHOLDER": "e.g. Waiting for exam",
       "COLOR_LABEL": "Colour",
+      "COLORS": {
+        "SLATE": "Slate",
+        "RED": "Red",
+        "BLUE": "Blue",
+        "AMBER": "Amber",
+        "PINK": "Pink",
+        "GREEN": "Green"
+      },
       "TYPE_LABEL": "Stage type",
       "TYPE_HINT": "Won and Lost close the card; In progress keeps it in the funnel.",
       "SAVE": "Save",

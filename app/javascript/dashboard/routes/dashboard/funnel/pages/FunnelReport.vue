@@ -30,6 +30,12 @@ const isModuleEnabled = computed(() =>
 
 const boardId = computed(() => Number(route.query.board) || null);
 const report = computed(() => funnelStore.report);
+
+// Uma serie com so zeros nao e uma serie: o grafico desenharia o eixo e nenhuma linha. Vale
+// tambem para o periodo que devolve dias, mas todos sem fechamento.
+const hasClosures = computed(() =>
+  (report.value?.closures ?? []).some(day => (day.won ?? 0) + (day.lost ?? 0) > 0)
+);
 const isFetching = computed(() => funnelStore.getUIFlags.fetchingReport);
 const board = computed(() =>
   funnelStore.getBoards.find(item => item.id === boardId.value)
@@ -181,7 +187,11 @@ watch([boardId, periodDays, isModuleEnabled], load, { immediate: true });
         <ReportStageBars :steps="report.steps" />
       </section>
 
+      <!-- Some quando nao ha fechamento no periodo, em vez de reservar 250px para um eixo sem
+           serie nenhuma. Um funil que ainda nao fechou nada e o caso normal de quem acabou de
+           comecar, e o espaco vazio empurrava o resto do relatorio para fora da tela. -->
       <section
+        v-if="hasClosures"
         class="flex flex-col gap-3 p-4 border rounded-lg border-n-weak bg-n-solid-1"
       >
         <h2 class="text-sm font-medium text-n-slate-12">

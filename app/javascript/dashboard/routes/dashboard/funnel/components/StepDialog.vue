@@ -6,7 +6,11 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Select from 'dashboard/components-next/select/Select.vue';
-import { STAGE_TYPES } from 'dashboard/helper/funnelHelper';
+import {
+  DEFAULT_STEP_COLOR,
+  STAGE_TYPES,
+  STEP_COLORS,
+} from 'dashboard/helper/funnelHelper';
 
 const props = defineProps({
   steps: { type: Array, default: () => [] },
@@ -15,26 +19,13 @@ const props = defineProps({
 
 const emit = defineEmits(['submit', 'destroy']);
 
-// Paleta fixa em vez de seletor livre: a cor pinta o cabecalho inteiro da coluna, e um roxo
-// escolhido a dedo pelo usuario pode deixar o texto ilegivel ou destoar do resto do quadro.
-const STEP_COLORS = [
-  '#6b7280',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ec4899',
-  '#ef4444',
-  '#f59e0b',
-  '#10b981',
-  '#14b8a6',
-];
-
 const { t } = useI18n();
 
 const dialogRef = ref(null);
 const editingStep = ref(null);
 const form = reactive({
   name: '',
-  color: STEP_COLORS[0],
+  color: DEFAULT_STEP_COLOR,
   stageType: 'open',
   probability: 0,
 });
@@ -55,7 +46,7 @@ const canDelete = computed(() => isEditing.value && props.steps.length > 1);
 const open = (step = null) => {
   editingStep.value = step;
   form.name = step?.name ?? '';
-  form.color = step?.color ?? STEP_COLORS[0];
+  form.color = step?.color ?? DEFAULT_STEP_COLOR;
   form.stageType = step?.stageType ?? 'open';
   form.probability = step?.probability ?? 0;
   dialogRef.value?.open();
@@ -100,17 +91,20 @@ defineExpose({ open, close });
           {{ t('FUNNEL.STEP.COLOR_LABEL') }}
         </span>
         <div class="flex flex-wrap gap-2">
+          <!-- O nome da cor e nao o hex no aria-label: um leitor de tela anunciava "#6b7280",
+               que nao diz nada a ninguem. O title mostra o mesmo nome no hover. -->
           <button
-            v-for="color in STEP_COLORS"
-            :key="color"
+            v-for="option in STEP_COLORS"
+            :key="option.value"
             type="button"
             class="rounded-full size-7 ring-offset-2 ring-offset-n-solid-1"
-            :class="form.color === color ? 'ring-2 ring-n-brand' : ''"
-            :style="{ backgroundColor: color }"
-            :aria-label="color"
-            :aria-pressed="form.color === color"
+            :class="form.color === option.value ? 'ring-2 ring-n-brand' : ''"
+            :style="{ backgroundColor: option.value }"
+            :aria-label="t(`FUNNEL.STEP.COLORS.${option.key}`)"
+            :title="t(`FUNNEL.STEP.COLORS.${option.key}`)"
+            :aria-pressed="form.color === option.value"
             :disabled="isLoading"
-            @click="form.color = color"
+            @click="form.color = option.value"
           />
         </div>
       </div>

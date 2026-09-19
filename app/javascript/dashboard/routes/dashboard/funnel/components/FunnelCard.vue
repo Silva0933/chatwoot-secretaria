@@ -8,9 +8,11 @@ import Icon from 'dashboard/components-next/icon/Icon.vue';
 import {
   timeInStep,
   dueState,
+  formatMoney,
   DUE_STATES,
   PRIORITY_META,
 } from 'dashboard/helper/funnelHelper';
+import { useFunnelStore } from 'dashboard/stores/funnel';
 
 const props = defineProps({
   task: { type: Object, required: true },
@@ -19,6 +21,7 @@ const props = defineProps({
 const emit = defineEmits(['open', 'openConversation']);
 
 const { t, locale } = useI18n();
+const funnelStore = useFunnelStore();
 
 // Prioridade e vencimento usam icone e texto alem da cor: em escala de cinza, ou para quem nao
 // distingue vermelho de amarelo, a cor sozinha nao diz nada (PRD 5.2, acessibilidade).
@@ -38,8 +41,6 @@ const DUE_CLASSES = {
 
 const MAX_VISIBLE_ASSIGNEES = 3;
 const MAX_VISIBLE_LABELS = 3;
-
-const title = computed(() => props.task.title || t('FUNNEL.CARD.NO_TITLE'));
 
 const priority = computed(() => {
   const meta = PRIORITY_META[props.task.priority];
@@ -77,6 +78,35 @@ const primaryConversation = computed(
 );
 
 const contact = computed(() => (props.task.contacts ?? [])[0] ?? null);
+
+// Conversa de grupo do WhatsApp chega com o id do grupo como titulo: dezoito digitos que nao
+// dizem nada a ninguem, com o nome util escondido na linha de baixo. Havendo contato, ele vira o
+// titulo. O id nao se perde — continua sendo o titulo do card quando aberto.
+const GROUP_ID_PATTERN = /^\d{12,}$/;
+
+const title = computed(() => {
+  const raw = props.task.title?.trim();
+  if (!raw) return t('FUNNEL.CARD.NO_TITLE');
+  if (GROUP_ID_PATTERN.test(raw) && contact.value?.name) return contact.value.name;
+
+  return raw;
+});
+
+// O contato some quando repete o titulo, que e o caso mais comum: o card nascido de uma conversa
+// leva o nome do contato nos dois lugares e gastava duas linhas para dizer uma coisa so. O avatar
+// fica, porque e ele que carrega o icone do canal.
+const contactName = computed(() =>
+  contact.value && contact.value.name !== title.value ? contact.value.name : ''
+);
+
+// Quanto vale a oportunidade, na moeda do quadro. Vazio quando nao ha valor: "R$ 0" afirmaria
+// que nao vale nada, e o que se sabe e que ninguem precificou.
+const value = computed(() => {
+  const amount = Number(props.task.value);
+  if (!Number.isFinite(amount) || !amount) return '';
+
+  return formatMoney(amount, funnelStore.getActiveBoard?.currency || 'BRL');
+});
 
 // O ChannelIcon do core resolve o glifo a partir de channel_type, provider e medium — os tres
 // vem no payload por isso. Reusar significa que um canal novo no Chatwoot aparece aqui sozinho.
@@ -157,6 +187,12 @@ const openLabel = computed(() =>
       >
         {{ title }}
       </span>
+      <span
+        v-if="value"
+        class="text-sm font-semibold shrink-0 tabular-nums text-n-slate-12"
+      >
+        {{ value }}
+      </span>
       <div
         v-if="assignees.length"
         class="flex items-center shrink-0 -space-x-1.5"
@@ -207,8 +243,8 @@ const openLabel = computed(() =>
           class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-n-solid-1"
         />
       </div>
-      <span v-if="contact" class="text-xs truncate text-n-slate-11">
-        {{ contact.name }}
+      <span v-if="contactName" class="text-xs truncate text-n-slate-11">
+        {{ contactName }}
       </span>
       <span
         v-if="channelInbox && !contact"
