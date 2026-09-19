@@ -25,7 +25,8 @@
     },
     "COLUMN": {
       "ADD_CARD": "Adicionar card",
-      "EMPTY": "Nenhum card nesta etapa"
+      "EMPTY": "Nenhum card nesta etapa",
+      "ADD": "Adicionar"
     },
     "CARD": {
       "OVERDUE": "Atrasado",
@@ -37,7 +38,21 @@
       "TOMORROW": "Amanhã",
       "TIME_IN_STEP": "Tempo nesta etapa",
       "OPEN_CONVERSATION": "Abrir conversa",
-      "CONFIGURE": "Editar card"
+      "CONFIGURE": "Editar card",
+      "UNASSIGNED": "Sem responsável",
+      "WAITING_SINCE": "Cliente esperando resposta há",
+      "MENU": {
+        "LABEL": "Opções do card",
+        "EDIT": "Editar card",
+        "OPEN_CONVERSATION": "Abrir conversa",
+        "MOVE": "Mover para etapa",
+        "ASSIGN": "Atribuir responsável",
+        "UNASSIGN": "Sem responsável",
+        "URGENCY": "Urgência",
+        "ARCHIVE": "Arquivar card",
+        "BACK": "Voltar",
+        "SEARCH_AGENT": "Buscar agente"
+      }
     },
     "PRIORITY": {
       "LABEL": "Prioridade",
@@ -171,7 +186,13 @@
       "CREATED": "Etapa criada.",
       "DELETED": "Etapa excluída.",
       "PROBABILITY_LABEL": "Probabilidade de fechar (%)",
-      "PROBABILITY_HINT": "Usada no valor ponderado do funil."
+      "PROBABILITY_HINT": "Usada no valor ponderado do funil.",
+      "MENU": {
+        "LABEL": "Opções da etapa",
+        "ADD_CARD": "Adicionar card aqui",
+        "MOVE_LEFT": "Mover etapa para a esquerda",
+        "MOVE_RIGHT": "Mover etapa para a direita"
+      }
     },
     "CONVERSATION": {
       "SIDEBAR_TITLE": "Funil",
@@ -182,7 +203,7 @@
       "STEP_CHANGED": "Etapa alterada."
     },
     "FILTERS": {
-      "SEARCH_PLACEHOLDER": "Buscar por título ou descrição",
+      "SEARCH_PLACEHOLDER": "Buscar card, contato ou etiqueta",
       "ANY_AGENT": "Todos os agentes",
       "ANY_INBOX": "Todas as caixas",
       "ANY_PRIORITY": "Todas as prioridades",
@@ -205,7 +226,21 @@
       "MORE": "Mais filtros",
       "SAVE_VIEW": "Salvar visão",
       "VIEW_NAME": "Nome da visão",
-      "REMOVE_VIEW": "Remover visão"
+      "REMOVE_VIEW": "Remover visão",
+      "BUTTON": "Filtros",
+      "ANY_WAITING": "Qualquer espera",
+      "WAITING_LABEL": "Tempo de espera",
+      "WAITING": {
+        "ANY": "Esperando resposta",
+        "OVER_1H": "Esperando > 1h",
+        "OVER_4H": "Esperando > 4h"
+      },
+      "AGENT_LABEL": "Responsável",
+      "INBOX_LABEL": "Caixa de entrada",
+      "PRIORITY_LABEL": "Prioridade",
+      "LABEL_LABEL": "Etiqueta",
+      "DUE_LABEL": "Prazo",
+      "ATTRIBUTE_LABEL": "Atributo personalizado"
     },
     "SORT": {
       "LABEL": "Ordenar por",
@@ -214,7 +249,8 @@
       "DUE": "Vencimento",
       "CREATED": "Mais recentes",
       "UPDATED": "Última atividade",
-      "TITLE": "Título"
+      "TITLE": "Título",
+      "WAITING": "Tempo de espera"
     },
     "SETTINGS": {
       "TITLE": "Configurações do quadro",
@@ -294,6 +330,20 @@
       "FORBIDDEN_TITLE": "Você não tem acesso a nenhum quadro",
       "FORBIDDEN_SUBTITLE": "Peça a um administrador para incluir você como membro de um quadro.",
       "OFFLINE": "Sem conexão — o quadro pode estar desatualizado."
+    },
+    "URGENCY": {
+      "MEDIUM": "Normal",
+      "HIGH": "Urgente",
+      "URGENT": "Muito urgente"
+    },
+    "METRICS": {
+      "OPEN_VALUE": "Em aberto",
+      "OPPORTUNITIES": "Oportunidades",
+      "CYCLE": "Ciclo médio",
+      "WAITING": "Esperando resposta",
+      "DAYS": "{count}d",
+      "ADVANCE": "Avanço do funil",
+      "ADVANCE_OF": "{advanced} de {total}"
     }
   }
 }

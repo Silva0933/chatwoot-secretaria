@@ -82,7 +82,11 @@ export const compareRank = (a, b) => {
 export const sortByRank = (items = []) =>
   [...items].sort((a, b) => compareRank(a.rank, b.rank));
 
+// 'waiting' primeiro e como padrao: a pergunta que abre um funil de manha e "quem esta
+// esperando ha mais tempo", nao "em que ordem eu arrastei os cards". A ordem por posicao
+// continua ali para quem organiza a coluna a mao, e e ela que libera o arrastar.
 export const SORT_OPTIONS = [
+  'waiting',
   'position',
   'priority',
   'due',
@@ -91,10 +95,16 @@ export const SORT_OPTIONS = [
   'title',
 ];
 
+export const DEFAULT_SORT = 'waiting';
+
 // Filtro de prazo em faixas nomeadas, nao em duas datas. "Vence hoje" e "atrasado" sao as
 // perguntas que alguem faz olhando um funil; um seletor de intervalo pede duas decisoes para
 // responder a mesma coisa.
 export const DUE_FILTERS = ['overdue', 'today', 'week', 'none'];
+
+// Faixas de espera, e nao um campo de minutos: "quem esta esperando ha mais de uma hora" e a
+// pergunta real; um numero livre pede uma decisao para responder a mesma coisa.
+export const WAITING_FILTERS = ['any', 'over_1h', 'over_4h'];
 
 export const EMPTY_FILTERS = Object.freeze({
   search: '',
@@ -103,6 +113,7 @@ export const EMPTY_FILTERS = Object.freeze({
   priority: null,
   labelId: null,
   due: null,
+  waiting: null,
   attributeKey: '',
   attributeValue: '',
 });
@@ -141,18 +152,70 @@ export const dueState = (dueAt, now = new Date()) => {
   return DUE_STATES.FUTURE;
 };
 
-// Prioridade nao pode depender so de cor: o PRD pede icone e texto por acessibilidade, e um
-// quadro cheio de bolinhas coloridas nao se le em escala de cinza nem por quem nao distingue
-// vermelho de verde.
-export const PRIORITY_META = {
+/**
+ * Duracao no formato curto do quadro: 12min, 3h, 12d.
+ *
+ * Curto de proposito. E um sinal de triagem lido de relance em dezenas de cards ao mesmo tempo,
+ * nao uma data — "ha 3 dias" ocuparia a linha inteira e diria a mesma coisa.
+ */
+const shortDuration = elapsed => {
+  // Nunca zero: um card que acabou de chegar mostrando "0min" parece defeito, e o minuto
+  // seguinte corrige sozinho.
+  if (elapsed < HOUR) return `${Math.max(Math.floor(elapsed / MINUTE), 1)}min`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
+
+  return `${Math.floor(elapsed / DAY)}d`;
+};
+
+export const WAITING_LEVELS = {
+  CALM: 'calm',
+  WARN: 'warn',
+  ALERT: 'alert',
+};
+
+// Uma hora e quatro horas. Nao sao numeros redondos por acaso: dentro da primeira hora a
+// resposta ainda esta no ritmo normal do atendimento, depois de quatro o cliente ja desistiu de
+// esperar. O meio e onde vale a pena avisar antes de virar problema.
+export const WAITING_WARN_AFTER = HOUR;
+export const WAITING_ALERT_AFTER = 4 * HOUR;
+
+/**
+ * Ha quanto tempo o CLIENTE espera resposta — o relogio dele, nao o da etapa.
+ *
+ * Vem de `waiting_since` da conversa, que o Chatwoot zera quando um agente responde e volta a
+ * marcar quando o cliente escreve de novo. Um card pode estar tres dias parado em "Proposta
+ * enviada" sem ninguem devendo nada: tempo na etapa e tempo de espera sao perguntas diferentes,
+ * e era a segunda que faltava no quadro.
+ */
+export const waitingState = (waitingSince, now = Date.now()) => {
+  if (!waitingSince) return null;
+
+  const since = new Date(waitingSince).getTime();
+  if (Number.isNaN(since)) return null;
+
+  const elapsed = Math.max(now - since, 0);
+
+  let level = WAITING_LEVELS.CALM;
+  if (elapsed >= WAITING_ALERT_AFTER) level = WAITING_LEVELS.ALERT;
+  else if (elapsed >= WAITING_WARN_AFTER) level = WAITING_LEVELS.WARN;
+
+  return { elapsed, level, label: shortDuration(elapsed) };
+};
+
+/**
+ * Urgencia em tres niveis e nao nas quatro prioridades do card.
+ *
+ * Baixa e media nao ganham marca nenhuma. Sao o estado da maioria — o importador legado marcou
+ * como media todo card que veio sem escolha — e marcar a maioria nao informa nada: so faz o
+ * urgente competir com ruido. As quatro prioridades continuam existindo no dialogo do card; o
+ * que muda e quantas delas merecem um simbolo no quadro.
+ *
+ * Sempre icone E cor, nunca cor sozinha: uma seta e duas setas sao formas diferentes, e e isso
+ * que sobrevive a escala de cinza e a quem nao distingue ambar de vermelho.
+ */
+export const URGENCY_META = {
   urgent: { icon: 'i-lucide-chevrons-up', tone: 'ruby' },
   high: { icon: 'i-lucide-chevron-up', tone: 'amber' },
-  // Media em ardosia e nao em azul: e a prioridade mais comum — o importador legado marcou
-  // assim todo card que vinha sem escolha — e um selo colorido em 100% dos cards nao
-  // informa nada, so compete com urgente e alta, que sao os que pedem acao. O icone e o
-  // rotulo continuam ali, entao a informacao fica; o que sai e o alarme falso.
-  medium: { icon: 'i-lucide-equal', tone: 'slate' },
-  low: { icon: 'i-lucide-chevron-down', tone: 'slate' },
 };
 
 const matchesDue = (task, wanted) => {
@@ -190,13 +253,28 @@ const matchesAttribute = (task, filters) => {
     .includes(wanted.toLowerCase());
 };
 
+// A espera vem da conversa; card sem conversa vinculada nao tem relogio e por isso nunca casa
+// com um filtro de espera — "esperando ha mais de 1h" e uma afirmacao sobre alguem do outro
+// lado, e ali nao ha ninguem.
+const matchesWaiting = (task, wanted) => {
+  const waiting = waitingState(task.waitingSince);
+  if (!waiting) return false;
+
+  if (wanted === 'over_1h') return waiting.elapsed >= WAITING_WARN_AFTER;
+  if (wanted === 'over_4h') return waiting.elapsed >= WAITING_ALERT_AFTER;
+
+  return true;
+};
+
 const matchesSearch = (task, term) => {
   if (!term) return true;
 
   const needle = term.trim().toLowerCase();
   if (!needle) return true;
 
-  return [task.title, task.description]
+  // O trecho entra na busca junto de titulo e descricao: ele e o texto que o operador acabou
+  // de ler no card, e procurar por uma palavra que esta na tela sem achar o card parece defeito.
+  return [task.title, task.description, task.excerpt]
     .filter(Boolean)
     .some(field => field.toLowerCase().includes(needle));
 };
@@ -235,6 +313,8 @@ export const filterTasks = (tasks = [], filters = EMPTY_FILTERS) =>
 
     if (filters.due && !matchesDue(task, filters.due)) return false;
 
+    if (filters.waiting && !matchesWaiting(task, filters.waiting)) return false;
+
     if (!matchesAttribute(task, filters)) return false;
 
     return true;
@@ -250,10 +330,23 @@ const byDate = (left, right, key) => {
   return a - b;
 };
 
-export const sortTasks = (tasks = [], sortBy = 'position') => {
+export const sortTasks = (tasks = [], sortBy = DEFAULT_SORT) => {
   const copy = [...tasks];
 
   switch (sortBy) {
+    case 'waiting':
+      // Quem espera ha mais tempo primeiro. Card sem espera vai para o fim e nao para o topo:
+      // ausencia de relogio nao e espera zero nem espera infinita — e pergunta que nao se
+      // aplica, e o desempate por posicao mantem esses estaveis entre si.
+      return copy.sort((left, right) => {
+        const a = waitingState(left.waitingSince);
+        const b = waitingState(right.waitingSince);
+        if (!a && !b) return compareRank(left.rank, right.rank);
+        if (!a) return 1;
+        if (!b) return -1;
+
+        return b.elapsed - a.elapsed || compareRank(left.rank, right.rank);
+      });
     case 'priority':
       // Sem prioridade vai por ultimo, e o desempate e a posicao, para a ordem nao dancar entre
       // dois cards igualmente urgentes a cada redesenho.
@@ -289,7 +382,7 @@ export const sortTasks = (tasks = [], sortBy = 'position') => {
 export const groupTasksByStep = (
   steps = [],
   tasks = [],
-  sortBy = 'position'
+  sortBy = DEFAULT_SORT
 ) => {
   const grouped = Object.fromEntries(steps.map(step => [step.id, []]));
 
@@ -317,25 +410,6 @@ export const neighboursAt = (orderedTasks, taskId) => {
     afterId: ordered[index - 1]?.id ?? null,
     beforeId: ordered[index + 1]?.id ?? null,
   };
-};
-
-/**
- * Ha quanto tempo o card esta parado na etapa, no formato curto do quadro: 55m, 3h, 12d.
- *
- * Curto de proposito. E um sinal de triagem lido de relance em dezenas de cards ao mesmo tempo,
- * nao uma data — "ha 3 dias" ocuparia a linha inteira e diria a mesma coisa.
- */
-export const timeInStep = (stepChangedAt, now = Date.now()) => {
-  if (!stepChangedAt) return '';
-
-  const since = new Date(stepChangedAt).getTime();
-  if (Number.isNaN(since)) return '';
-
-  const elapsed = Math.max(now - since, 0);
-  if (elapsed < HOUR) return `${Math.max(Math.floor(elapsed / MINUTE), 1)}m`;
-  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
-
-  return `${Math.floor(elapsed / DAY)}d`;
 };
 
 export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -402,4 +476,59 @@ export const formatMoney = (value, currency = 'BRL', locale = 'pt-BR') => {
   } catch {
     return `${currency} ${Math.round(amount).toLocaleString(locale)}`;
   }
+};
+
+/**
+ * A faixa de metricas do cabecalho do quadro.
+ *
+ * Tudo sai dos cards que ja estao na tela e respeita o filtro, como os contadores das colunas:
+ * uma faixa que ignorasse o filtro contaria um quadro que ninguem esta vendo. Nada disso pede
+ * uma segunda consulta ao servidor — o quadro ja carrega os cards ativos de uma vez.
+ */
+export const boardMetrics = (tasks = [], steps = []) => {
+  const openStepIds = new Set(
+    steps
+      .filter(step => (step.stageType || 'open') === 'open')
+      .map(step => step.id)
+  );
+  // A etapa de entrada e a primeira da fileira: dela para a frente o card "avancou".
+  const entryStepId = steps[0]?.id ?? null;
+
+  const open = tasks.filter(task => openStepIds.has(task.funnelStepId));
+
+  const waiting = open.filter(task => {
+    const state = waitingState(task.waitingSince);
+    return state && state.level !== WAITING_LEVELS.CALM;
+  }).length;
+
+  const advanced = open.filter(
+    task => task.funnelStepId !== entryStepId
+  ).length;
+
+  // Ciclo medio do que fechou, ganho ou perdido: quanto tempo um card leva da criacao ate sair
+  // do funil. Medir isso no que ainda esta aberto responderia "ha quanto tempo estao em aberto",
+  // que e outra pergunta e so cresce.
+  const closed = tasks.filter(
+    task => !openStepIds.has(task.funnelStepId) && task.createdAt
+  );
+  const cycleMs = closed.reduce((total, task) => {
+    const from = new Date(task.createdAt).getTime();
+    const to = new Date(task.stepChangedAt ?? task.updatedAt).getTime();
+    if (Number.isNaN(from) || Number.isNaN(to)) return total;
+
+    return total + Math.max(to - from, 0);
+  }, 0);
+
+  return {
+    openValue: open.reduce((total, task) => {
+      const amount = Number(task.value);
+      return Number.isFinite(amount) ? total + amount : total;
+    }, 0),
+    opportunities: open.length,
+    // Sem nada fechado ainda, o ciclo e null e nao zero: "0d" afirmaria que os cards fecham no
+    // mesmo dia, quando o que se sabe e que nenhum fechou.
+    cycleDays: closed.length ? Math.round(cycleMs / closed.length / DAY) : null,
+    waiting,
+    advanced,
+  };
 };

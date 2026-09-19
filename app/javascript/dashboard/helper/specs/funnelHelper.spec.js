@@ -4,7 +4,9 @@ import {
   sortByRank,
   groupTasksByStep,
   neighboursAt,
-  timeInStep,
+  waitingState,
+  WAITING_LEVELS,
+  boardMetrics,
   dueState,
   DUE_STATES,
   filterTasks,
@@ -78,30 +80,41 @@ describe('funnelHelper', () => {
     });
   });
 
-  describe('timeInStep', () => {
+  describe('waitingState', () => {
     const now = new Date('2026-03-10T12:00:00Z').getTime();
     const ago = ms => new Date(now - ms).toISOString();
+    const MIN = 60 * 1000;
 
     it('counts minutes below an hour', () => {
-      expect(timeInStep(ago(55 * 60 * 1000), now)).toBe('55m');
+      expect(waitingState(ago(55 * MIN), now).label).toBe('55min');
     });
 
-    it('counts hours below a day', () => {
-      expect(timeInStep(ago(3 * 60 * 60 * 1000), now)).toBe('3h');
+    it('counts hours below a day, then days', () => {
+      expect(waitingState(ago(3 * 60 * MIN), now).label).toBe('3h');
+      expect(waitingState(ago(12 * 24 * 60 * MIN), now).label).toBe('12d');
     });
 
-    it('counts days beyond that', () => {
-      expect(timeInStep(ago(12 * 24 * 60 * 60 * 1000), now)).toBe('12d');
+    // Card recem chegado mostra 1min e nao 0min: zero parece defeito, e o minuto seguinte corrige.
+    it('never shows zero for a customer who just wrote', () => {
+      expect(waitingState(ago(2000), now).label).toBe('1min');
     });
 
-    // Card recem movido mostra 1m e nao 0m: zero parece defeito, e o minuto seguinte corrige.
-    it('never shows zero for a card just moved', () => {
-      expect(timeInStep(ago(2000), now)).toBe('1m');
+    // A escala inteira, nos limites: a primeira hora ainda e o ritmo normal do atendimento e a
+    // quarta e onde o cliente ja desistiu. Sao os dois pontos em que a cor do card muda.
+    it('turns amber at one hour and ruby at four', () => {
+      expect(waitingState(ago(59 * MIN), now).level).toBe(WAITING_LEVELS.CALM);
+      expect(waitingState(ago(60 * MIN), now).level).toBe(WAITING_LEVELS.WARN);
+      expect(waitingState(ago(239 * MIN), now).level).toBe(WAITING_LEVELS.WARN);
+      expect(waitingState(ago(240 * MIN), now).level).toBe(
+        WAITING_LEVELS.ALERT
+      );
     });
 
-    it('returns empty for a missing or invalid timestamp', () => {
-      expect(timeInStep(null, now)).toBe('');
-      expect(timeInStep('nao e data', now)).toBe('');
+    // Sem conversa vinculada nao ha relogio: o card nao mostra selo nenhum, em vez de mostrar
+    // um zero que afirmaria que ninguem esta esperando.
+    it('returns null for a missing or invalid timestamp', () => {
+      expect(waitingState(null, now)).toBeNull();
+      expect(waitingState('nao e data', now)).toBeNull();
     });
   });
 
@@ -312,6 +325,67 @@ describe('funnelHelper', () => {
       const original = tasks.map(t => t.id);
       sortTasks(tasks, 'title');
       expect(tasks.map(t => t.id)).toEqual(original);
+    });
+
+    // A ordem padrao do quadro. Quem espera ha mais tempo primeiro, e card sem relogio por
+    // ultimo: ausencia de espera nao e espera zero nem infinita.
+    it('puts the longest wait first and cards without a clock last', () => {
+      const hoursAgo = hours =>
+        new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+      const waiting = [
+        { id: 1, rank: '300', waitingSince: hoursAgo(1) },
+        { id: 2, rank: '100', waitingSince: null },
+        { id: 3, rank: '200', waitingSince: hoursAgo(6) },
+      ];
+
+      expect(sortTasks(waiting, 'waiting').map(t => t.id)).toEqual([3, 1, 2]);
+    });
+  });
+
+  describe('boardMetrics', () => {
+    const steps = [
+      { id: 10, stageType: 'open' },
+      { id: 20, stageType: 'open' },
+      { id: 30, stageType: 'won' },
+    ];
+    const hoursAgo = hours =>
+      new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+    const tasks = [
+      { id: 1, funnelStepId: 10, value: '1000', waitingSince: hoursAgo(2) },
+      { id: 2, funnelStepId: 20, value: '500', waitingSince: hoursAgo(0.2) },
+      { id: 3, funnelStepId: 10, value: null, waitingSince: null },
+      {
+        id: 4,
+        funnelStepId: 30,
+        value: '9000',
+        createdAt: '2026-03-01T00:00:00Z',
+        stepChangedAt: '2026-03-05T00:00:00Z',
+      },
+    ];
+
+    // O que esta fechado nao conta como oportunidade nem soma ao valor em aberto: um funil que
+    // somasse os ganhos no "em aberto" cresceria para sempre e nunca mais cairia.
+    it('counts only the open stages as pipeline', () => {
+      const metrics = boardMetrics(tasks, steps);
+
+      expect(metrics.opportunities).toBe(3);
+      expect(metrics.openValue).toBe(1500);
+    });
+
+    // Dentro da primeira hora ainda e o ritmo normal: so conta quem passou dela.
+    it('counts as waiting only the cards past the first hour', () => {
+      expect(boardMetrics(tasks, steps).waiting).toBe(1);
+    });
+
+    it('measures the cycle on what closed, and stays null while nothing has', () => {
+      expect(boardMetrics(tasks, steps).cycleDays).toBe(4);
+      expect(boardMetrics(tasks.slice(0, 3), steps).cycleDays).toBeNull();
+    });
+
+    // "Avancou" e ter saido da primeira etapa da fileira.
+    it('counts as advanced what left the entry stage', () => {
+      expect(boardMetrics(tasks, steps).advanced).toBe(1);
     });
   });
 

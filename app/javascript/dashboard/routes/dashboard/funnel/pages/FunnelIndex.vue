@@ -8,7 +8,7 @@ import { useAlert } from 'dashboard/composables';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
 import { useFunnelStore } from 'dashboard/stores/funnel';
-import { EMPTY_FILTERS, formatMoney } from 'dashboard/helper/funnelHelper';
+import { EMPTY_FILTERS } from 'dashboard/helper/funnelHelper';
 import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
 
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -20,11 +20,12 @@ import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import BoardCreateDialog from '../components/BoardCreateDialog.vue';
 import BoardSettingsDialog from '../components/BoardSettingsDialog.vue';
 import FunnelBoardCanvas from '../components/FunnelBoardCanvas.vue';
+import FunnelBoardMetrics from '../components/FunnelBoardMetrics.vue';
 import FunnelToolbar from '../components/FunnelToolbar.vue';
 import StepDialog from '../components/StepDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const funnelStore = useFunnelStore();
@@ -71,22 +72,11 @@ const canManageSettings = computed(
   () => activeBoard.value?.permissions?.manageSettings ?? false
 );
 
-// O contador do cabecalho soma o quadro inteiro, nao a coluna: e a leitura de volume que a
-// referencia mostra ao lado do nome do funil.
-const totalTasks = computed(() => funnelStore.tasks.length);
 const visibleTaskCount = computed(() => funnelStore.getFilteredTasks.length);
 
-// O total ponderado so aparece quando ha valor lancado: um "R$ 0" permanente num funil de
-// clinica, onde ninguem preenche valor, seria ruido fixo no cabecalho.
-const pipelineValue = computed(() => funnelStore.getPipelineValue);
-const showPipelineValue = computed(() => pipelineValue.value > 0);
-const pipelineValueLabel = computed(() =>
-  formatMoney(
-    pipelineValue.value,
-    activeBoard.value?.currency ?? 'BRL',
-    locale.value.replace('_', '-')
-  )
-);
+// A faixa de metricas le os cards ja filtrados, como os contadores das colunas: uma faixa que
+// ignorasse o filtro descreveria um quadro que ninguem esta vendo.
+const visibleTasks = computed(() => funnelStore.getFilteredTasks);
 
 const isLoadingBoard = computed(
   () => uiFlags.value.fetchingBoards || uiFlags.value.fetchingTasks
@@ -95,14 +85,43 @@ const isSavingTask = computed(
   () => uiFlags.value.creatingTask || uiFlags.value.updatingTask
 );
 
-const boardMenuItems = computed(() =>
-  boards.value.map(board => ({
-    label: board.name,
-    value: board.id,
-    action: 'switch',
-    isSelected: board.id === activeBoard.value?.id,
-  }))
-);
+// O seletor deixa de ser so a lista de quadros. "Novo quadro" e "Arquivar" eram dois icones
+// soltos no topo que nao diziam o que faziam e competiam com as tres acoes de uso diario;
+// aqui estao ao lado da lista de quadros, que e sobre o que eles agem.
+const boardMenuSections = computed(() => {
+  const sections = [
+    {
+      title: t('FUNNEL.BOARD.SWITCH'),
+      items: boards.value.map(board => ({
+        label: board.name,
+        value: board.id,
+        action: 'switch',
+        isSelected: board.id === activeBoard.value?.id,
+      })),
+    },
+  ];
+
+  const manage = [];
+  if (isAdministrator.value) {
+    manage.push({
+      label: t('FUNNEL.BOARD.NEW'),
+      value: 'new',
+      action: 'new',
+      icon: 'i-lucide-plus',
+    });
+  }
+  if (activeBoard.value && canManageBoard.value) {
+    manage.push({
+      label: t('FUNNEL.BOARD.ARCHIVE'),
+      value: 'archive',
+      action: 'archive',
+      icon: 'i-lucide-archive',
+    });
+  }
+  if (manage.length) sections.push({ items: manage });
+
+  return sections;
+});
 
 const syncBoardInUrl = boardId => {
   if (Number(route.query.board) === Number(boardId)) return;
@@ -191,9 +210,12 @@ const toggleBoardSwitcher = () => {
   showBoardSwitcher.value = !showBoardSwitcher.value;
 };
 
-const onBoardMenuAction = ({ value }) => {
+const onBoardMenuAction = ({ action, value }) => {
   showBoardSwitcher.value = false;
-  selectBoard(value);
+
+  if (action === 'new') boardCreateDialogRef.value?.open();
+  else if (action === 'archive') archiveBoardDialogRef.value?.open();
+  else selectBoard(value);
 };
 
 const onCreateBoard = async payload => {
@@ -267,6 +289,43 @@ const onMoveTask = async payload => {
     await funnelStore.moveTask(payload);
   } catch (error) {
     useAlert(error.message || t('FUNNEL.API.MOVE_ERROR'));
+  }
+};
+
+// Mover pelo menu manda o card para o fim da etapa escolhida: sem vizinhos informados, o
+// MoveService o coloca depois do ultimo, que e onde alguem que escolheu "Proposta enviada" numa
+// lista espera encontra-lo.
+const onMoveTaskToStep = ({ task, stepId }) => {
+  if (task.funnelStepId === stepId) return;
+
+  onMoveTask({ id: task.id, stepId, afterId: null, beforeId: null });
+};
+
+// O menu atribui uma pessoa, nao um conjunto: quem precisa de dois responsaveis abre o card.
+// A API troca o conjunto inteiro, entao null aqui e "tirar todo mundo".
+const onAssignTask = async ({ task, userId }) => {
+  try {
+    await funnelStore.replaceAssociation({
+      id: task.id,
+      kind: 'assignees',
+      ids: userId ? [userId] : [],
+    });
+  } catch (error) {
+    useAlert(error.message);
+  }
+};
+
+const onSetTaskUrgency = async ({ task, priority }) => {
+  if (task.priority === priority) return;
+
+  try {
+    await funnelStore.updateTask({
+      id: task.id,
+      priority,
+      lockVersion: task.lockVersion,
+    });
+  } catch (error) {
+    useAlert(error.message);
   }
 };
 
@@ -402,21 +461,15 @@ watch(
 
     <template v-else>
       <header
-        class="flex items-center justify-between gap-4 px-6 h-20 shrink-0"
+        class="flex items-center justify-between gap-4 px-6 h-16 shrink-0"
       >
-        <div class="relative flex items-center gap-2">
+        <div class="relative flex items-center min-w-0 gap-1">
           <h1 class="text-xl font-medium truncate text-n-slate-12">
             {{ activeBoard?.name || t('FUNNEL.HEADER') }}
           </h1>
-          <span
-            v-if="activeBoard"
-            class="px-2 py-0.5 text-xs font-medium rounded-full bg-n-alpha-2 text-n-slate-11"
-            :title="t('FUNNEL.BOARD.TOTAL')"
-          >
-            {{ totalTasks }}
-          </span>
           <OnClickOutside
             v-if="boards.length"
+            class="relative shrink-0"
             @trigger="showBoardSwitcher = false"
           >
             <Button
@@ -425,60 +478,38 @@ watch(
               color="slate"
               size="xs"
               :aria-label="t('FUNNEL.BOARD.SWITCH')"
+              :aria-expanded="showBoardSwitcher"
               @click="toggleBoardSwitcher"
             />
             <DropdownMenu
               v-if="showBoardSwitcher"
-              :menu-items="boardMenuItems"
-              class="ltr:left-0 rtl:right-0 top-9"
+              :menu-sections="boardMenuSections"
+              class="w-60 ltr:left-0 rtl:right-0 top-9"
               @action="onBoardMenuAction"
             />
           </OnClickOutside>
         </div>
 
-        <div class="flex items-center gap-2">
+        <!-- Tres acoes, nao seis. Relatorio, configuracoes e "Novo card" sao as de uso diario;
+             criar e arquivar quadro foram para o seletor, ao lado da lista sobre a qual agem. -->
+        <div class="flex items-center gap-2 shrink-0">
           <Button
-            v-if="isAdministrator"
+            v-if="activeBoard"
             variant="faded"
             color="slate"
             size="sm"
-            icon="i-lucide-plus"
-            :label="t('FUNNEL.BOARD.NEW')"
-            @click="boardCreateDialogRef?.open()"
-          />
-          <span
-            v-if="showPipelineValue"
-            class="px-2 py-1 text-xs font-medium rounded-md bg-n-alpha-2 text-n-slate-11"
-            :title="t('FUNNEL.SETTINGS.PIPELINE_VALUE')"
-          >
-            {{ pipelineValueLabel }}
-          </span>
-          <Button
-            v-if="activeBoard"
-            variant="ghost"
-            color="slate"
-            size="sm"
             icon="i-lucide-chart-no-axes-column"
-            :aria-label="t('FUNNEL.REPORT.TITLE')"
+            :label="t('FUNNEL.REPORT.TITLE')"
             @click="openReport"
           />
           <Button
             v-if="activeBoard && canManageSettings"
-            variant="ghost"
+            variant="faded"
             color="slate"
             size="sm"
             icon="i-lucide-settings"
             :aria-label="t('FUNNEL.SETTINGS.CONFIGURE')"
             @click="boardSettingsRef?.open()"
-          />
-          <Button
-            v-if="activeBoard && canManageBoard"
-            variant="ghost"
-            color="slate"
-            size="sm"
-            icon="i-lucide-archive"
-            :aria-label="t('FUNNEL.BOARD.ARCHIVE')"
-            @click="archiveBoardDialogRef?.open()"
           />
           <Button
             v-if="activeBoard && canCreateTask"
@@ -557,6 +588,13 @@ watch(
         />
       </div>
 
+      <FunnelBoardMetrics
+        v-if="activeBoard"
+        :tasks="visibleTasks"
+        :steps="steps"
+        :currency="activeBoard.currency ?? 'BRL'"
+      />
+
       <FunnelToolbar v-if="activeBoard" />
 
       <div
@@ -577,6 +615,7 @@ watch(
         :tasks-by-step="tasksByStep"
         :can-edit="canCreateTask"
         :can-manage-steps="canManageSettings"
+        :can-archive="canManageBoard"
         :can-reorder="funnelStore.canReorder"
         class="grow min-h-0"
         @move="onMoveTask"
@@ -585,7 +624,12 @@ watch(
         @open-conversation="goToConversation"
         @configure-step="stepDialogRef?.open($event)"
         @reorder-steps="onReorderSteps"
+        @delete-step="onRequestDeleteStep"
         @add-step="stepDialogRef?.open()"
+        @move-task="onMoveTaskToStep"
+        @assign-task="onAssignTask"
+        @set-task-urgency="onSetTaskUrgency"
+        @archive-task="onRequestArchiveTask"
       />
     </template>
 

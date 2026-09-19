@@ -34,6 +34,68 @@ RSpec.describe 'Funnel Tasks API', type: :request do
       expect(response.parsed_body['payload'].pluck('id')).to include(task.id)
     end
 
+    # As duas leituras que o card redesenhado faz da conversa: ha quanto tempo o cliente espera
+    # e o que ele disse por ultimo. Nenhuma das duas existia no payload antes.
+    context 'when the card has a primary conversation' do
+      let(:inbox) { create(:inbox, account: account) }
+      let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+      let(:task) { create(:funnel_task, board_for_task: board, step: step) }
+
+      before do
+        Funnel::TaskConversation.create!(task: task, conversation: conversation, is_primary: true)
+      end
+
+      def payload_for(card)
+        get tasks_path, headers: administrator.create_new_auth_token, as: :json
+        response.parsed_body['payload'].find { |item| item['id'] == card.id }
+      end
+
+      it 'exposes the waiting clock of the conversation' do
+        conversation.update!(waiting_since: 3.hours.ago)
+
+        expect(Time.zone.parse(payload_for(task)['waiting_since'])).to be_within(1.minute).of(3.hours.ago)
+      end
+
+      # A ultima DO CLIENTE, nao a ultima da conversa: a resposta do agente e o que quem le o
+      # quadro escreveu, e nao diz o que o cliente quer.
+      it 'excerpts the last incoming message and ignores the agent reply' do
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, content: 'Pode mandar a proposta')
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, content: 'Ja estou preparando')
+
+        expect(payload_for(task)['excerpt']).to eq('Pode mandar a proposta')
+      end
+
+      it 'falls back to the description when the customer never wrote' do
+        task.update!(description: 'Follow-up combinado por telefone')
+
+        expect(payload_for(task)['excerpt']).to eq('Follow-up combinado por telefone')
+      end
+
+      # O quadro carrega o funil inteiro de uma vez: uma consulta por card abriria uma por linha.
+      it 'reads every excerpt in a single query' do
+        3.times do
+          other = create(:conversation, account: account, inbox: inbox)
+          create(:message, account: account, inbox: inbox, conversation: other,
+                           message_type: :incoming, content: 'Oi')
+          Funnel::TaskConversation.create!(
+            task: create(:funnel_task, board_for_task: board, step: step),
+            conversation: other, is_primary: true
+          )
+        end
+
+        queries = []
+        subscriber = ActiveSupport::Notifications.subscribe('sql.active_record') do |*, data|
+          queries << data[:sql] if data[:sql].include?('DISTINCT ON (conversation_id)')
+        end
+        get tasks_path, headers: administrator.create_new_auth_token, as: :json
+        ActiveSupport::Notifications.unsubscribe(subscriber)
+
+        expect(queries.size).to eq(1)
+      end
+    end
+
     it 'hides cards from an agent who is not a member of the board' do
       create(:funnel_task, board_for_task: board, step: step)
 

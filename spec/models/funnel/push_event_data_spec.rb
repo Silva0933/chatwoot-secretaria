@@ -30,6 +30,22 @@ RSpec.describe 'Funnel push event payloads', type: :request do
     expect(event_keys).to eq(api_keys)
   end
 
+  # Chaves iguais nao bastam para estes dois: o quadro le o trecho em lote pelo controller e o
+  # websocket le um card por vez pelo modelo. Sao dois caminhos ate a mesma frase, e um card que
+  # mudasse de texto so por ter chegado por tempo real seria dificil de desconfiar.
+  it 'excerpts the same customer message over both ports' do
+    create(:message, account: account, inbox: conversation.inbox, conversation: conversation,
+                     message_type: :incoming, content: 'Pode mandar a proposta')
+    create(:message, account: account, inbox: conversation.inbox, conversation: conversation,
+                     message_type: :outgoing, content: 'Ja estou preparando')
+
+    get "/api/v1/accounts/#{account.id}/funnel/boards/#{board.id}/tasks/#{task.id}",
+        headers: administrator.create_new_auth_token, as: :json
+
+    expect(task.reload.push_event_data[:excerpt]).to eq('Pode mandar a proposta')
+    expect(response.parsed_body['excerpt']).to eq('Pode mandar a proposta')
+  end
+
   it 'describes the channel the same way in both' do
     get "/api/v1/accounts/#{account.id}/funnel/boards/#{board.id}/tasks/#{task.id}",
         headers: administrator.create_new_auth_token, as: :json

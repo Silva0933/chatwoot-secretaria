@@ -25,7 +25,8 @@
     },
     "COLUMN": {
       "ADD_CARD": "Add card",
-      "EMPTY": "No cards in this stage"
+      "EMPTY": "No cards in this stage",
+      "ADD": "Add"
     },
     "CARD": {
       "OVERDUE": "Overdue",
@@ -37,7 +38,21 @@
       "TOMORROW": "Tomorrow",
       "TIME_IN_STEP": "Time in this stage",
       "OPEN_CONVERSATION": "Open conversation",
-      "CONFIGURE": "Edit card"
+      "CONFIGURE": "Edit card",
+      "UNASSIGNED": "Unassigned",
+      "WAITING_SINCE": "Customer waiting for a reply for",
+      "MENU": {
+        "LABEL": "Card options",
+        "EDIT": "Edit card",
+        "OPEN_CONVERSATION": "Open conversation",
+        "MOVE": "Move to stage",
+        "ASSIGN": "Assign owner",
+        "UNASSIGN": "Unassigned",
+        "URGENCY": "Urgency",
+        "ARCHIVE": "Archive card",
+        "BACK": "Back",
+        "SEARCH_AGENT": "Search agent"
+      }
     },
     "PRIORITY": {
       "LABEL": "Priority",
@@ -171,7 +186,13 @@
       "CREATED": "Stage created.",
       "DELETED": "Stage deleted.",
       "PROBABILITY_LABEL": "Probability to close (%)",
-      "PROBABILITY_HINT": "Used for the weighted pipeline value."
+      "PROBABILITY_HINT": "Used for the weighted pipeline value.",
+      "MENU": {
+        "LABEL": "Stage options",
+        "ADD_CARD": "Add card here",
+        "MOVE_LEFT": "Move stage left",
+        "MOVE_RIGHT": "Move stage right"
+      }
     },
     "CONVERSATION": {
       "SIDEBAR_TITLE": "Funnel",
@@ -182,7 +203,7 @@
       "STEP_CHANGED": "Stage changed."
     },
     "FILTERS": {
-      "SEARCH_PLACEHOLDER": "Search by title or description",
+      "SEARCH_PLACEHOLDER": "Search card, contact or label",
       "ANY_AGENT": "All agents",
       "ANY_INBOX": "All inboxes",
       "ANY_PRIORITY": "All priorities",
@@ -205,7 +226,21 @@
       "MORE": "More filters",
       "SAVE_VIEW": "Save view",
       "VIEW_NAME": "View name",
-      "REMOVE_VIEW": "Remove view"
+      "REMOVE_VIEW": "Remove view",
+      "BUTTON": "Filters",
+      "ANY_WAITING": "Any wait",
+      "WAITING_LABEL": "Waiting time",
+      "WAITING": {
+        "ANY": "Waiting for reply",
+        "OVER_1H": "Waiting > 1h",
+        "OVER_4H": "Waiting > 4h"
+      },
+      "AGENT_LABEL": "Owner",
+      "INBOX_LABEL": "Inbox",
+      "PRIORITY_LABEL": "Priority",
+      "LABEL_LABEL": "Label",
+      "DUE_LABEL": "Due",
+      "ATTRIBUTE_LABEL": "Custom attribute"
     },
     "SORT": {
       "LABEL": "Sort by",
@@ -214,7 +249,8 @@
       "DUE": "Due date",
       "CREATED": "Newest",
       "UPDATED": "Last activity",
-      "TITLE": "Title"
+      "TITLE": "Title",
+      "WAITING": "Waiting time"
     },
     "SETTINGS": {
       "TITLE": "Board settings",
@@ -294,6 +330,20 @@
       "FORBIDDEN_TITLE": "You have access to no board",
       "FORBIDDEN_SUBTITLE": "Ask an administrator to add you as a member of a board.",
       "OFFLINE": "Offline — the board may be out of date."
+    },
+    "URGENCY": {
+      "MEDIUM": "Normal",
+      "HIGH": "Urgent",
+      "URGENT": "Very urgent"
+    },
+    "METRICS": {
+      "OPEN_VALUE": "Open",
+      "OPPORTUNITIES": "Opportunities",
+      "CYCLE": "Avg. cycle",
+      "WAITING": "Waiting for reply",
+      "DAYS": "{count}d",
+      "ADVANCE": "Funnel progress",
+      "ADVANCE_OF": "{advanced} of {total}"
     }
   }
 }
