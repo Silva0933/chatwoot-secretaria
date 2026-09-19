@@ -34,7 +34,9 @@ const report = computed(() => funnelStore.report);
 // Uma serie com so zeros nao e uma serie: o grafico desenharia o eixo e nenhuma linha. Vale
 // tambem para o periodo que devolve dias, mas todos sem fechamento.
 const hasClosures = computed(() =>
-  (report.value?.closures ?? []).some(day => (day.won ?? 0) + (day.lost ?? 0) > 0)
+  (report.value?.closures ?? []).some(
+    day => (day.won ?? 0) + (day.lost ?? 0) > 0
+  )
 );
 const isFetching = computed(() => funnelStore.getUIFlags.fetchingReport);
 const board = computed(() =>

@@ -87,7 +87,8 @@ const GROUP_ID_PATTERN = /^\d{12,}$/;
 const title = computed(() => {
   const raw = props.task.title?.trim();
   if (!raw) return t('FUNNEL.CARD.NO_TITLE');
-  if (GROUP_ID_PATTERN.test(raw) && contact.value?.name) return contact.value.name;
+  const isGroupId = GROUP_ID_PATTERN.test(raw);
+  if (isGroupId && contact.value?.name) return contact.value.name;
 
   return raw;
 });
