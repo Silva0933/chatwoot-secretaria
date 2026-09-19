@@ -158,7 +158,6 @@ defineExpose({ open, close });
   <Dialog
     ref="dialogRef"
     width="2xl"
-    overflow-y-auto
     :title="t('FUNNEL.SETTINGS.TITLE')"
     :confirm-button-label="t('FUNNEL.SETTINGS.SAVE')"
     :cancel-button-label="t('FUNNEL.SETTINGS.CANCEL')"
@@ -231,6 +230,26 @@ defineExpose({ open, close });
         </ul>
       </section>
 
+      <!-- Antes das automacoes de proposito: a dica delas diz "vinculadas acima", e o texto so e
+           verdade se as caixas vierem primeiro. Tambem e a ordem em que se configura — escolher
+           o canal antes das regras que agem sobre ele. -->
+      <section class="flex flex-col gap-2">
+        <span class="text-sm font-medium text-n-slate-12">
+          {{ t('FUNNEL.SETTINGS.INBOXES') }}
+        </span>
+        <p class="text-xs text-n-slate-10">
+          {{ t('FUNNEL.SETTINGS.INBOXES_HINT') }}
+        </p>
+        <TagMultiSelectComboBox
+          v-model="inboxIds"
+          :options="inboxOptions"
+          :disabled="isSaving"
+          :placeholder="t('FUNNEL.SETTINGS.INBOXES_PLACEHOLDER')"
+          :search-placeholder="t('FUNNEL.ASSOCIATIONS.SEARCH')"
+          :empty-state="t('FUNNEL.SETTINGS.NO_INBOXES')"
+        />
+      </section>
+
       <section class="flex flex-col gap-2">
         <span class="text-sm font-medium text-n-slate-12">
           {{ t('FUNNEL.AUTOMATIONS.TITLE') }}
@@ -253,23 +272,6 @@ defineExpose({ open, close });
             {{ t(`FUNNEL.AUTOMATIONS.RULES.${rule.toUpperCase()}`) }}
           </span>
         </label>
-      </section>
-
-      <section class="flex flex-col gap-2">
-        <span class="text-sm font-medium text-n-slate-12">
-          {{ t('FUNNEL.SETTINGS.INBOXES') }}
-        </span>
-        <p class="text-xs text-n-slate-10">
-          {{ t('FUNNEL.SETTINGS.INBOXES_HINT') }}
-        </p>
-        <TagMultiSelectComboBox
-          v-model="inboxIds"
-          :options="inboxOptions"
-          :disabled="isSaving"
-          :placeholder="t('FUNNEL.SETTINGS.INBOXES_PLACEHOLDER')"
-          :search-placeholder="t('FUNNEL.ASSOCIATIONS.SEARCH')"
-          :empty-state="t('FUNNEL.SETTINGS.NO_INBOXES')"
-        />
       </section>
     </div>
 

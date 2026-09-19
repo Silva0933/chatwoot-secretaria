@@ -9,7 +9,7 @@ import Select from 'dashboard/components-next/select/Select.vue';
 import TextArea from 'dashboard/components-next/textarea/TextArea.vue';
 import TaskActivity from './TaskActivity.vue';
 import TaskAssociations from './TaskAssociations.vue';
-import { TASK_PRIORITIES } from 'dashboard/helper/funnelHelper';
+import { formatMoney, TASK_PRIORITIES } from 'dashboard/helper/funnelHelper';
 import { useFunnelStore } from 'dashboard/stores/funnel';
 
 const props = defineProps({
@@ -49,6 +49,24 @@ const liveTask = computed(() =>
 );
 const isInvalid = computed(() => !form.title.trim());
 
+// O erro do titulo so aparece depois que o usuario saiu do campo ou tentou gravar. Antes disso o
+// dialogo abria ja repreendendo por um campo em que ninguem tinha tocado.
+const titleTouched = ref(false);
+const showTitleError = computed(() => titleTouched.value && isInvalid.value);
+
+const boardCurrency = computed(
+  () => funnelStore.getActiveBoard?.currency || 'BRL'
+);
+
+// Confirma a ordem de grandeza enquanto se digita: "1250" vira "R$ 1.250" embaixo do campo, entao
+// um zero a mais aparece antes de virar oportunidade de dez mil no relatorio.
+const valuePreview = computed(() => {
+  if (form.value === '') return '';
+
+  const amount = Number(form.value);
+  return Number.isFinite(amount) ? formatMoney(amount, boardCurrency.value) : '';
+});
+
 const stepOptions = computed(() =>
   props.steps.map(step => ({ value: step.id, label: step.name }))
 );
@@ -79,9 +97,19 @@ const fromLocalInput = value => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
+// O valor chega da API como texto ("1250.5") para nao passar por float. <input type="number">
+// recusa null e undefined, entao o vazio precisa virar string vazia antes de chegar nele.
+const toNumberInput = value => {
+  if (value === null || value === undefined || value === '') return '';
+
+  const number = Number(value);
+  return Number.isFinite(number) ? String(number) : '';
+};
+
 const resetForm = () => {
   funnelStore.clearTaskEvents();
   editingTask.value = null;
+  titleTouched.value = false;
   form.title = '';
   form.description = '';
   form.funnelStepId = props.steps[0]?.id ?? '';
@@ -101,7 +129,7 @@ const open = ({ task = null, step = null } = {}) => {
     form.funnelStepId = task.funnelStepId ?? props.steps[0]?.id ?? '';
     form.priority = task.priority ?? '';
     form.dueAt = toLocalInput(task.dueAt);
-    form.value = task.value ?? '';
+    form.value = toNumberInput(task.value);
     attributePairs.value = Object.entries(task.customAttributes ?? {}).map(
       ([key, value]) => ({ key, value: String(value ?? '') })
     );
@@ -115,6 +143,7 @@ const open = ({ task = null, step = null } = {}) => {
 const close = () => dialogRef.value?.close();
 
 const handleConfirm = () => {
+  titleTouched.value = true;
   if (isInvalid.value) return;
 
   emit('submit', {
@@ -163,10 +192,11 @@ defineExpose({ open, close });
           v-model="form.title"
           :label="t('FUNNEL.TASK.TITLE_LABEL')"
           :placeholder="t('FUNNEL.TASK.TITLE_PLACEHOLDER')"
-          :message="isInvalid ? t('FUNNEL.TASK.TITLE_REQUIRED') : ''"
-          :message-type="isInvalid ? 'error' : 'info'"
+          :message="showTitleError ? t('FUNNEL.TASK.TITLE_REQUIRED') : ''"
+          :message-type="showTitleError ? 'error' : 'info'"
           :disabled="isLoading"
           autofocus
+          @blur="titleTouched = true"
         />
         <TextArea
           v-model="form.description"
@@ -200,12 +230,27 @@ defineExpose({ open, close });
             />
           </label>
         </div>
-        <Input
-          v-model="form.dueAt"
-          type="datetime-local"
-          :label="t('FUNNEL.TASK.DUE_AT_LABEL')"
-          :disabled="isLoading"
-        />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            v-model="form.dueAt"
+            type="datetime-local"
+            :label="t('FUNNEL.TASK.DUE_AT_LABEL')"
+            :disabled="isLoading"
+          />
+          <!-- Sem este campo o quadro guardava moeda, a etapa guardava probabilidade e o
+               relatorio somava funil ponderado, tudo sobre um valor que nao tinha por onde
+               entrar. A pre-visualizacao embaixo confirma a ordem de grandeza do que foi
+               digitado. -->
+          <Input
+            v-model="form.value"
+            type="number"
+            min="0"
+            :label="t('FUNNEL.TASK.VALUE_LABEL')"
+            :placeholder="t('FUNNEL.TASK.VALUE_PLACEHOLDER')"
+            :message="valuePreview"
+            :disabled="isLoading"
+          />
+        </div>
       </div>
 
       <section class="flex flex-col gap-2">

@@ -76,6 +76,7 @@
       "LABELS": "Etiquetas",
       "CONTACTS": "Contactos",
       "VALUE_LABEL": "Valor",
+      "VALUE_PLACEHOLDER": "Ej.: 1500",
       "ATTRIBUTES": "Atributos personalizados",
       "ATTRIBUTE_KEY": "Clave",
       "ATTRIBUTE_VALUE": "Valor",
