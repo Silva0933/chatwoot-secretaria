@@ -27,6 +27,10 @@ on:
       - 'spec/listeners/funnel_*'
       - 'spec/factories/funnel.rb'
       - 'spec/migrations/**'
+      - 'app/javascript/dashboard/routes/dashboard/funnel/**'
+      - 'app/javascript/dashboard/stores/funnel.js'
+      - 'app/javascript/dashboard/helper/funnelHelper.js'
+      - 'app/javascript/dashboard/i18n/fazer-ai/**'
       - '.github/workflows/funnel_spec.yml'
   workflow_dispatch:
 
@@ -90,6 +94,17 @@ jobs:
 
       - name: Lint the module
         run: bundle exec rubocop --force-exclusion custom spec/migrations spec/models/funnel spec/services/funnel spec/requests/api/v1/accounts/funnel spec/requests/api/v1/accounts/kanban spec/listeners/funnel_automation_listener_spec.rb spec/listeners/funnel_listener_spec.rb
+
+      # As telas do funil sao metade do modulo e o job so olhava o Ruby: uma mudanca em .vue
+      # subia sem lint nem teste nenhum.
+      - name: Lint the funnel frontend
+        # pnpm exec e nao pnpm eslint: o script do package.json ja carrega o glob de app/**,
+        # e os caminhos passados seriam ACRESCENTADOS a ele — varrendo o repositorio inteiro e
+        # reprovando por erro pre-existente em arquivo que este modulo nao toca.
+        run: pnpm exec eslint 'app/javascript/dashboard/routes/dashboard/funnel/**/*.vue' app/javascript/dashboard/stores/funnel.js app/javascript/dashboard/helper/funnelHelper.js
+
+      - name: Run the funnel frontend tests
+        run: pnpm test app/javascript/dashboard/helper/specs/funnelHelper.spec.js
 
       - name: Create database
         run: bundle exec rake db:create

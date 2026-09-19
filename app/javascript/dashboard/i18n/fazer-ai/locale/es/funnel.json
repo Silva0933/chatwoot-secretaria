@@ -76,6 +76,7 @@
       "LABELS": "Etiquetas",
       "CONTACTS": "Contactos",
       "VALUE_LABEL": "Valor",
+      "VALUE_PLACEHOLDER": "Ej.: 1500",
       "ATTRIBUTES": "Atributos personalizados",
       "ATTRIBUTE_KEY": "Clave",
       "ATTRIBUTE_VALUE": "Valor",
@@ -146,6 +147,14 @@
       "NAME_LABEL": "Nombre",
       "NAME_PLACEHOLDER": "Ej.: Esperando examen",
       "COLOR_LABEL": "Color",
+      "COLORS": {
+        "SLATE": "Pizarra",
+        "RED": "Rojo",
+        "BLUE": "Azul",
+        "AMBER": "Ámbar",
+        "PINK": "Rosa",
+        "GREEN": "Verde"
+      },
       "TYPE_LABEL": "Tipo de etapa",
       "TYPE_HINT": "Ganado y Perdido cierran la tarjeta; En curso la mantiene en el embudo.",
       "SAVE": "Guardar",
@@ -193,6 +202,7 @@
       },
       "ATTRIBUTE_KEY": "Atributo",
       "ATTRIBUTE_VALUE": "Valor del atributo",
+      "MORE": "Más filtros",
       "SAVE_VIEW": "Guardar vista",
       "VIEW_NAME": "Nombre de la vista",
       "REMOVE_VIEW": "Quitar vista"

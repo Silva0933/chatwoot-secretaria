@@ -147,7 +147,11 @@ export const dueState = (dueAt, now = new Date()) => {
 export const PRIORITY_META = {
   urgent: { icon: 'i-lucide-chevrons-up', tone: 'ruby' },
   high: { icon: 'i-lucide-chevron-up', tone: 'amber' },
-  medium: { icon: 'i-lucide-equal', tone: 'blue' },
+  // Media em ardosia e nao em azul: e a prioridade mais comum — o importador legado marcou
+  // assim todo card que vinha sem escolha — e um selo colorido em 100% dos cards nao
+  // informa nada, so compete com urgente e alta, que sao os que pedem acao. O icone e o
+  // rotulo continuam ali, entao a informacao fica; o que sai e o alarme falso.
+  medium: { icon: 'i-lucide-equal', tone: 'slate' },
   low: { icon: 'i-lucide-chevron-down', tone: 'slate' },
 };
 
@@ -338,7 +342,33 @@ export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
 export const STAGE_TYPES = ['open', 'won', 'lost'];
 
-export const BOARD_TEMPLATES = ['clinic', 'blank'];
+/**
+ * Paleta das etapas. Seis opcoes e nao oito, e a escolha foi medida e nao estetica: turquesa e
+ * verde separam por dE 9,3 em visao normal, violeta e azul por 11,5 — os dois abaixo do piso de
+ * 15, ou seja, dificeis de distinguir mesmo por quem enxerga todas as cores. Ficaram de fora.
+ * Nesta ordem, o pior par vizinho e verde<->rosa: dE 9,0 em deuteranopia e 23,1 em visao normal.
+ *
+ * A ardosia e propositalmente sem croma: e a opcao "sem cor", para etapa que nao quer destaque.
+ *
+ * Nada disso torna a cor confiavel sozinha — um seletor livre nunca torna, porque quem ordena as
+ * colunas e o usuario e qualquer par pode acabar lado a lado. Por isso o cabecalho da coluna traz
+ * o nome da etapa e o icone de ganho/perdido: a cor agrupa, o texto identifica.
+ */
+export const STEP_COLORS = [
+  { value: '#64748B', key: 'SLATE' },
+  { value: '#E5484D', key: 'RED' },
+  { value: '#2D8FE0', key: 'BLUE' },
+  { value: '#C77D11', key: 'AMBER' },
+  { value: '#D6409F', key: 'PINK' },
+  { value: '#2E9E5B', key: 'GREEN' },
+];
+
+export const DEFAULT_STEP_COLOR = STEP_COLORS[2].value;
+
+// 'blank' primeiro e como padrao: 'clinic' e heranca da origem da fazer.ai e traz oito etapas
+// de jornada de paciente, que nao descrevem a maioria das contas. Quem quer a de clinica
+// escolhe; quem nao quer nao precisa apagar oito etapas para comecar.
+export const BOARD_TEMPLATES = ['blank', 'clinic'];
 
 export const BOARD_MEMBER_ROLES = ['manager', 'member', 'viewer'];
 

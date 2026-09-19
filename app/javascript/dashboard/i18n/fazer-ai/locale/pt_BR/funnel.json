@@ -76,6 +76,7 @@
       "LABELS": "Etiquetas",
       "CONTACTS": "Contatos",
       "VALUE_LABEL": "Valor",
+      "VALUE_PLACEHOLDER": "Ex.: 1500",
       "ATTRIBUTES": "Atributos personalizados",
       "ATTRIBUTE_KEY": "Chave",
       "ATTRIBUTE_VALUE": "Valor",
@@ -146,6 +147,14 @@
       "NAME_LABEL": "Nome",
       "NAME_PLACEHOLDER": "Ex.: Aguardando exame",
       "COLOR_LABEL": "Cor",
+      "COLORS": {
+        "SLATE": "Ardósia",
+        "RED": "Vermelho",
+        "BLUE": "Azul",
+        "AMBER": "Âmbar",
+        "PINK": "Rosa",
+        "GREEN": "Verde"
+      },
       "TYPE_LABEL": "Tipo de etapa",
       "TYPE_HINT": "Ganho e Perdido encerram o card; Em andamento o mantém no funil.",
       "SAVE": "Salvar",
@@ -193,6 +202,7 @@
       },
       "ATTRIBUTE_KEY": "Atributo",
       "ATTRIBUTE_VALUE": "Valor do atributo",
+      "MORE": "Mais filtros",
       "SAVE_VIEW": "Salvar visão",
       "VIEW_NAME": "Nome da visão",
       "REMOVE_VIEW": "Remover visão"

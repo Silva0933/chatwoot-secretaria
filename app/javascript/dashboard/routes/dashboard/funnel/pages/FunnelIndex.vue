@@ -374,8 +374,11 @@ watch(() => [funnelStore.filters, funnelStore.sortBy], writeFiltersToUrl, {
 
 watch(
   [isModuleEnabled, () => route.params.accountId],
-  ([, accountId], previous) => {
-    if (previous && previous[1] !== accountId) funnelStore.reset();
+  // routeAccountId e nao accountId: o de cima vem de useAccount() e este e o parametro da rota.
+  // Com o mesmo nome, os dois sao a mesma coisa hoje e deixam de ser no dia em que a conta mudar
+  // sem a rota mudar junto — e o leitor nao tem como notar.
+  ([, routeAccountId], previous) => {
+    if (previous && previous[1] !== routeAccountId) funnelStore.reset();
     if (isModuleEnabled.value) readFiltersFromUrl();
     loadEverything();
   },
