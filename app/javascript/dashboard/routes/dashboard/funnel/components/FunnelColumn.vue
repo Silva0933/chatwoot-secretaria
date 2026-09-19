@@ -84,15 +84,18 @@ const onChange = event => emit('change', { stepId: props.step.id, event });
         :style="{ backgroundColor: step.color }"
       />
       <div class="flex items-center gap-2 px-3 py-2.5 text-n-slate-12">
+        <h3 class="text-sm font-semibold truncate">
+          {{ step.name }}
+        </h3>
+        <!-- Depois do nome, e nao antes: a esquerda, o icone empurrava o texto e as duas colunas
+             terminais comecavam alguns pixels adiante das outras quatro, desalinhando a fileira
+             inteira de cabecalhos. -->
         <Icon
           v-if="stageIcon"
           :icon="stageIcon"
           class="shrink-0 size-3.5"
           :class="stageIconClass"
         />
-        <h3 class="text-sm font-semibold truncate">
-          {{ step.name }}
-        </h3>
         <span
           class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-n-alpha-2 text-n-slate-11"
         >

@@ -233,8 +233,11 @@ const openLabel = computed(() =>
       {{ summary }}
     </p>
 
-    <!-- 3. contato e canal de origem: de onde este atendimento veio -->
-    <div v-if="contact || channelInbox" class="flex items-center gap-1.5">
+    <!-- 3. contato e canal de origem: de onde este atendimento veio.
+         A linha so existe quando ha nome a mostrar. Esconder o contato repetido deixava um avatar
+         sozinho ocupando uma linha inteira — o card ficava MAIS espacoso, que e o oposto do que a
+         mudanca queria. Sem nome, o canal desce para o rodape, onde cabe num icone. -->
+    <div v-if="contactName" class="flex items-center gap-1.5">
       <div v-if="contact" class="relative shrink-0">
         <Avatar :name="contact.name" :size="20" rounded-full />
         <ChannelIcon
@@ -244,15 +247,8 @@ const openLabel = computed(() =>
           class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-n-solid-1"
         />
       </div>
-      <span v-if="contactName" class="text-xs truncate text-n-slate-11">
+      <span class="text-xs truncate text-n-slate-11">
         {{ contactName }}
-      </span>
-      <span
-        v-if="channelInbox && !contact"
-        class="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-n-alpha-2 text-n-slate-11"
-      >
-        <ChannelIcon :inbox="channelInbox" use-brand-icon class="size-3" />
-        {{ channelInbox.name }}
       </span>
     </div>
 
@@ -304,6 +300,13 @@ const openLabel = computed(() =>
       <div
         class="flex items-center gap-2 text-xs ltr:ml-auto rtl:mr-auto text-n-slate-10"
       >
+        <span
+          v-if="channelInbox && !contactName"
+          class="flex items-center"
+          :title="channelInbox.name"
+        >
+          <ChannelIcon :inbox="channelInbox" use-brand-icon class="size-3" />
+        </span>
         <span
           v-if="conversations.length"
           class="flex items-center gap-1"
