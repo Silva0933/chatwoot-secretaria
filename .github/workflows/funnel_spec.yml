@@ -98,7 +98,10 @@ jobs:
       # As telas do funil sao metade do modulo e o job so olhava o Ruby: uma mudanca em .vue
       # subia sem lint nem teste nenhum.
       - name: Lint the funnel frontend
-        run: pnpm eslint 'app/javascript/dashboard/routes/dashboard/funnel/**/*.vue' app/javascript/dashboard/stores/funnel.js app/javascript/dashboard/helper/funnelHelper.js
+        # pnpm exec e nao pnpm eslint: o script do package.json ja carrega o glob de app/**,
+        # e os caminhos passados seriam ACRESCENTADOS a ele — varrendo o repositorio inteiro e
+        # reprovando por erro pre-existente em arquivo que este modulo nao toca.
+        run: pnpm exec eslint 'app/javascript/dashboard/routes/dashboard/funnel/**/*.vue' app/javascript/dashboard/stores/funnel.js app/javascript/dashboard/helper/funnelHelper.js
 
       - name: Run the funnel frontend tests
         run: pnpm test app/javascript/dashboard/helper/specs/funnelHelper.spec.js

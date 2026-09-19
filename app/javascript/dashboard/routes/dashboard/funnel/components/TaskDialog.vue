@@ -64,7 +64,9 @@ const valuePreview = computed(() => {
   if (form.value === '') return '';
 
   const amount = Number(form.value);
-  return Number.isFinite(amount) ? formatMoney(amount, boardCurrency.value) : '';
+  return Number.isFinite(amount)
+    ? formatMoney(amount, boardCurrency.value)
+    : '';
 });
 
 const stepOptions = computed(() =>
