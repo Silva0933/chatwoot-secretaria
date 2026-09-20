@@ -344,6 +344,47 @@ RSpec.describe Whatsapp::Session::Facade do
       expect(backend.commands).to be_empty
     end
 
+    # The other way the same capability is missing, and it is not the same situation: the
+    # switch is on, group threads are in the sidebar and being answered, and only the
+    # management surface is absent. An agent told "groups are disabled" here goes looking
+    # for a switch that is already on.
+    it 'says groups are receivable but unmanageable when only the command surface is missing' do
+      allow(Whatsapp::Session::Registry).to receive(:capabilities_for).and_return(%w[groups])
+
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        expect { channel.provider_service.group_leave(group_jid) }
+          .to raise_error(Whatsapp::Session::Errors::NotSupported, /cannot manage groups/)
+      end
+
+      expect(backend.commands).to be_empty
+    end
+
+    # And nothing reaches the provider on the way to that refusal, including the reads the
+    # dashboard fires on its own: the panel is gone, and a stale one still mounted must not
+    # turn into calls the inbox cannot make.
+    it 'reaches the provider for nothing while only the command surface is missing' do
+      allow(Whatsapp::Session::Registry).to receive(:capabilities_for).and_return(%w[groups])
+      # Named rather than inferred from `backend.commands`: the syncer talks to the
+      # provider through its own path, so an empty command list says nothing about whether
+      # it ran.
+      expect(Whatsapp::Session::Groups::Syncer).not_to receive(:new)
+
+      expect(facade.allow_group_creation?).to be(false)
+      facade.sync_group(conversation)
+
+      expect(backend.commands).to be_empty
+    end
+
+    # And the guard is on the command surface and not on the switch: an inbox that has both
+    # still syncs, or the check above would pass by never syncing at all.
+    it 'syncs a group while the command surface is there' do
+      expect(Whatsapp::Session::Groups::Syncer).to receive(:new).and_return(instance_double(
+                                                                              Whatsapp::Session::Groups::Syncer, perform: nil
+                                                                            ))
+
+      facade.sync_group(conversation)
+    end
+
     it 'answers group creation in the shape Groups::CreateService reads' do
       result = facade.create_group('Equipe de Vendas', ['5541999990000@s.whatsapp.net'])
 
@@ -405,7 +446,8 @@ RSpec.describe Whatsapp::Session::Facade do
   # invalid and the session never pairs. `false` is not a value it accepts either, which
   # is why a backend without the capability sends nothing at all.
   it 'describes the call policy the way the contract types it' do
-    channel.setup_channel_provider
+    allow(channel).to receive(:session_capabilities).and_return(%w[groups])
+    channel.provider_service.setup_channel_provider
     expect(backend.last_command.calls).to be_nil
 
     allow(channel).to receive(:session_capabilities).and_return(%w[calls])
@@ -422,6 +464,22 @@ RSpec.describe Whatsapp::Session::Facade do
     channel.disconnect_channel_provider
 
     expect(backend.commands_of('session.delete')).to be_present
+  end
+
+  # A backend that cannot tear down its session is not a quiet case. What the fallback can
+  # do is end the connection, which leaves the pairing alive under a session id nothing
+  # points at any more, and this line is the only trace of that anywhere: the operator sees
+  # the inbox disappear and concludes it is over.
+  it 'says so in the log when the provider has no teardown' do
+    allow(backend).to receive(:delete_session).and_raise(
+      Whatsapp::Session::Errors::NotSupported, 'no teardown here'
+    )
+    allow(Rails.logger).to receive(:warn)
+
+    channel.disconnect_channel_provider
+
+    expect(Rails.logger).to have_received(:warn).with(/leaves the pairing alive/)
+    expect(backend.commands_of('session.disconnect')).to be_present
   end
 
   # Chatwoot availability is online/offline/busy; the contract knows available and

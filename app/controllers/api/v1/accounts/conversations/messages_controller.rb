@@ -14,7 +14,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
     trigger_typing_event(CONVERSATION_TYPING_OFF)
   rescue StandardError => e
-    render_could_not_create_error(e.message)
+    render_rescued_error(e)
   end
 
   def update
@@ -44,11 +44,11 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   def retry
     return if message.blank?
-    return head :unprocessable_entity unless reset_message_for_retry
+    return head :unprocessable_entity unless claim_message_for_retry
 
-    ::SendReplyJob.perform_later(message.id) if claim_message_retry
+    ::SendReplyJob.perform_later(message.id)
   rescue StandardError => e
-    render_could_not_create_error(e.message)
+    render_rescued_error(e)
   end
 
   def translate
@@ -81,9 +81,15 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     original_content = message.content
     # Only save previous_content on first edit to preserve the original message
     previous_content_to_save = message.is_edited ? message.previous_content : original_content
+    # The write below is optimistic: the channel has not taken the edit yet, and the rescue in
+    # `edit_message_on_channel` writes the body back when it refuses. An automation must not run on a
+    # body the contact never received, so the row's own announcement is deferred and made here, once
+    # the channel has accepted (fazer-ai/chatwoot#648).
+    message.defer_edit_announcement = true
     message.update!(content: new_content, is_edited: true, previous_content: previous_content_to_save)
 
     edit_message_on_channel(new_content, original_content)
+    message.announce_edit
 
     @message = message.reload
   end
@@ -98,20 +104,12 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message_finder ||= MessageFinder.new(@conversation, params)
   end
 
-  def claim_message_retry
-    message.with_lock do
-      next false unless message.failed?
+  # A pending contact-info request keeps its marker across the retry: the eligibility check reads it,
+  # and a bare retry would send the interactive message with no record of what it is.
+  def retry_content_attributes
+    return message.content_attributes if message.content_attributes.dig('whatsapp_contact_info', 'type') == 'request'
 
-      Messages::StatusUpdateService.new(message, 'sent').perform
-      previous_source_id = message.source_id
-      retry_attributes = { content_attributes: {} }
-      retry_attributes[:source_id] = nil unless @conversation.inbox.api? || @conversation.inbox.web_widget?
-      message.update!(retry_attributes)
-      if retry_attributes.key?(:source_id) && previous_source_id.present?
-        Rails.logger.info "Cleared older source ID #{previous_source_id} for message #{message.id}"
-      end
-      true
-    end
+    {}
   end
 
   def permitted_params
@@ -128,20 +126,36 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
   end
 
+  # One claim, not two. Both halves used to run in sequence and the first flipped the very status
+  # the second tested, so the second could only ever answer false and the send job it guarded was
+  # never queued: Retry cleared the failure marker and delivered nothing.
+  #
   # The `deleted?` check and the `content_attributes` reset have to share the lock the DELETE endpoint
   # takes: a delete landing between them would have its flag wiped by the reset, and the job `retry`
   # queues afterwards would then push the "deleted" placeholder to the contact.
-  def reset_message_for_retry
-    retryable = false
+  def claim_message_for_retry
     message.with_lock do
-      next if message.deleted?
-      next unless message.failed? && (message.outgoing? || message.template?)
+      next false if message.deleted?
+      next false unless message.failed? && (message.outgoing? || message.template?)
 
-      retryable = true
       Messages::StatusUpdateService.new(message, 'sent').perform
-      message.update!(content_attributes: {}, source_id: nil)
+      reset_message_state_for_retry
+      true
     end
-    retryable
+  end
+
+  # Called from inside the claim's lock, so the reset cannot land between a delete and its check.
+  def reset_message_state_for_retry
+    previous_source_id = message.source_id
+    retry_attributes = { content_attributes: retry_content_attributes }
+    # An API or web widget inbox owns its source_id: it is the caller's own reference, and the
+    # reply job there is an email notification rather than a channel send. On a provider channel
+    # a stale id instead makes Base::SendOnChannelService treat the message as already sent.
+    retry_attributes[:source_id] = nil unless @conversation.inbox.api? || @conversation.inbox.web_widget?
+    message.update!(retry_attributes)
+    return unless retry_attributes.key?(:source_id) && previous_source_id.present?
+
+    Rails.logger.info "Cleared older source ID #{previous_source_id} for message #{message.id}"
   end
 
   def edit_message_on_channel(new_content, original_content)
@@ -157,7 +171,23 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     else
       message.update!(content: original_content, is_edited: false, previous_content: nil)
     end
+    announce_restored_content
     raise e
+  end
+
+  # The body that came back is the one the contact has, and the rules for it may never have run: the
+  # announcement that named it found this refused body on the row and stood down (#660, #661).
+  # `Message#announce_restored_body` is what decides whether there is anything to say, and it has two
+  # questions to answer rather than one -- a write-back that undid a first edit takes the edit marker with
+  # it and announces no edit, and yet the body it put back may be one a recovery brought and nobody ever
+  # asked the arrival rules about (#666).
+  #
+  # Swallowed on purpose. The channel's own error is the one the agent needs to see, and replacing it with
+  # one about the job transport would cost them the reason their edit did not go out.
+  def announce_restored_content
+    message.announce_restored_body
+  rescue StandardError => e
+    Rails.logger.error "Failed to announce the restored content: #{e.message}"
   end
 
   # API inbox check
@@ -173,3 +203,5 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     Rails.configuration.dispatcher.dispatch(event, Time.zone.now, conversation: @conversation, user: user, is_private: params[:private])
   end
 end
+
+Api::V1::Accounts::Conversations::MessagesController.prepend_mod_with('Api::V1::Accounts::Conversations::MessagesController')

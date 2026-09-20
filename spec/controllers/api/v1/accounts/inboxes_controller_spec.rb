@@ -7,6 +7,70 @@ RSpec.describe 'Inboxes API', type: :request do
   let(:agent) { create(:user, account: account, role: :agent) }
   let(:admin) { create(:user, account: account, role: :administrator) }
 
+  describe 'POST /api/v1/accounts/{account.id}/inboxes/{inbox.id}/rotate_hmac_token' do
+    let(:channel) { create(:channel_widget, account: account) }
+    let(:inbox) { channel.inbox }
+    let(:url) { "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/rotate_hmac_token" }
+
+    [:channel_widget, :channel_api].each do |channel_factory|
+      context "with #{channel_factory}" do
+        let(:channel) { create(channel_factory, account: account) }
+
+        it 'rotates the persisted token and returns the updated inbox for an administrator' do
+          old_token = channel.hmac_token
+
+          post url, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:ok)
+          expect(channel.reload.hmac_token).to be_present
+          expect(channel.hmac_token).not_to eq(old_token)
+          expect(response.parsed_body).to include('id' => inbox.id, 'hmac_token' => channel.hmac_token)
+        end
+
+        it 'rejects an assigned agent without changing the token' do
+          create(:inbox_member, user: agent, inbox: inbox)
+
+          expect do
+            post url, headers: agent.create_new_auth_token, as: :json
+          end.not_to(change { channel.reload.hmac_token })
+
+          expect(response).to have_http_status(:unauthorized)
+        end
+      end
+    end
+
+    it 'rejects unauthenticated requests without changing the token' do
+      expect do
+        post url, as: :json
+      end.not_to(change { channel.reload.hmac_token })
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'does not rotate an inbox belonging to another account' do
+      other_inbox = create(:inbox)
+
+      expect do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{other_inbox.id}/rotate_hmac_token",
+             headers: admin.create_new_auth_token, as: :json
+      end.not_to(change { other_inbox.channel.reload.hmac_token })
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    context 'with an unsupported channel' do
+      let(:inbox) { create(:inbox, :with_email, account: account) }
+
+      it 'returns not found without updating the channel' do
+        expect do
+          post url, headers: admin.create_new_auth_token, as: :json
+        end.not_to(change { inbox.channel.reload.attributes })
+
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+  end
+
   describe 'GET /api/v1/accounts/{account.id}/inboxes' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do
@@ -55,6 +119,35 @@ RSpec.describe 'Inboxes API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(JSON.parse(response.body, symbolize_names: true)[:payload].size).to eq(1)
+      end
+
+      it 'returns safe channel identifiers for assigned inboxes' do
+        allow(Facebook::Messenger::Subscriptions).to receive(:subscribe).and_return(true)
+        instagram_channel = create(:channel_instagram, account: account, instagram_id: 'instagram-id', provider_name: 'acme_support')
+        tiktok_channel = create(:channel_tiktok, account: account, business_id: 'tiktok-business-id', provider_name: 'acme_tiktok')
+        facebook_inbox = create(
+          :inbox,
+          account: account,
+          channel: build(:channel_facebook_page, account: account, inbox: nil, provider_name: 'Acme Facebook')
+        )
+        twitter_inbox = create(:inbox, account: account, channel: create(:channel_twitter_profile, account: account, profile_id: 'x-profile-id'))
+        line_inbox = create(:inbox, account: account,
+                                    channel: build(:channel_line, account: account, inbox: nil, line_channel_id: 'line-channel-id'))
+        [instagram_channel.inbox, tiktok_channel.inbox, facebook_inbox, twitter_inbox, line_inbox].each do |channel_inbox|
+          create(:inbox_member, user: agent, inbox: channel_inbox)
+        end
+
+        get "/api/v1/accounts/#{account.id}/inboxes",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        inboxes_by_id = response.parsed_body['payload'].index_by { |item| item['id'] }
+        expect(inboxes_by_id[instagram_channel.inbox.id]['provider_name']).to eq('acme_support')
+        expect(inboxes_by_id[tiktok_channel.inbox.id]['business_id']).to eq('tiktok-business-id')
+        expect(inboxes_by_id[tiktok_channel.inbox.id]['provider_name']).to eq('acme_tiktok')
+        expect(inboxes_by_id[facebook_inbox.id]['provider_name']).to eq('Acme Facebook')
+        expect(inboxes_by_id[twitter_inbox.id]['profile_id']).to eq('x-profile-id')
+        expect(inboxes_by_id[line_inbox.id]['line_channel_id']).to eq('line-channel-id')
       end
 
       context 'when provider_config' do
@@ -1519,7 +1612,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
         it 'calls the health service with correct channel' do
           expect(Whatsapp::HealthService).to receive(:new).with(whatsapp_channel).and_return(health_service)
-          expect(health_service).to receive(:sync_health_status!)
+          expect(health_service).to receive(:sync_health_status!).with(include_business_profile: true)
 
           get "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/health",
               headers: admin.create_new_auth_token,
@@ -1572,7 +1665,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
           expect(response).to have_http_status(:bad_request)
           json_response = response.parsed_body
-          expect(json_response['error']).to eq('Health data only available for WhatsApp Cloud API channels')
+          expect(json_response['error']).to eq('Health data only available for WhatsApp Cloud API and Twilio SMS channels')
         end
 
         it 'returns bad request error for agent' do
@@ -1584,7 +1677,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
           expect(response).to have_http_status(:bad_request)
           json_response = response.parsed_body
-          expect(json_response['error']).to eq('Health data only available for WhatsApp Cloud API channels')
+          expect(json_response['error']).to eq('Health data only available for WhatsApp Cloud API and Twilio SMS channels')
         end
       end
 
@@ -1601,7 +1694,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
           expect(response).to have_http_status(:bad_request)
           json_response = response.parsed_body
-          expect(json_response['error']).to eq('Health data only available for WhatsApp Cloud API channels')
+          expect(json_response['error']).to eq('Health data only available for WhatsApp Cloud API and Twilio SMS channels')
         end
       end
 
@@ -1613,6 +1706,260 @@ RSpec.describe 'Inboxes API', type: :request do
 
           expect(response).to have_http_status(:not_found)
         end
+      end
+    end
+  end
+
+  # The button on the inbox health screen. Meta refuses the per-number override for a whole class
+  # of accounts, and since that refusal stopped taking the channel down (#568) the answer here was
+  # "registered successfully" either way, which is the only thing the operator sees at the moment
+  # they press it.
+  # Meta answers three levels of webhook routing and delivery follows the most specific one that
+  # exists, so the same green "configured" URL means two different things: the inbox owns its
+  # routing, or it is riding on the app's own callback and stops the day that URL changes.
+  describe 'GET /api/v1/accounts/{account.id}/inboxes/{inbox.id}/health routing level' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    end
+    let(:whatsapp_inbox) { create(:inbox, account: account, channel: whatsapp_channel) }
+    let(:expected_url) { 'https://chat.example.com/webhooks/whatsapp/+123' }
+    let(:health_service) { instance_double(Whatsapp::HealthService) }
+
+    # The outer keys are the service's own symbols; the ones inside come from Meta's JSON.
+    def stub_health(configuration)
+      allow(Whatsapp::HealthService).to receive(:new).and_return(health_service)
+      allow(health_service).to receive(:sync_health_status!).and_return(
+        { id: 'phone123', webhook_configuration: configuration, expected_webhook_url: expected_url }
+      )
+    end
+
+    def routing_answer
+      get "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/health",
+          headers: admin.create_new_auth_token, as: :json
+      response.parsed_body['routed_by_app_callback_only']
+    end
+
+    it 'is false when this number has an override of its own' do
+      stub_health({ 'phone_number' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    it 'is false when the business account has one' do
+      stub_health({ 'whatsapp_business_account' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    # Delivery follows the most specific override that exists, wherever it points: a number sent
+    # to the wrong place is misrouted, not riding on the app callback, and the card already says
+    # so with its own URL mismatch warning.
+    it 'is false when the override exists but points somewhere else' do
+      stub_health({ 'phone_number' => 'https://elsewhere.example.com/hook', 'application' => expected_url })
+
+      expect(routing_answer).to be(false)
+    end
+
+    it 'is true when only the app callback is pointed here' do
+      stub_health({ 'application' => expected_url })
+
+      expect(routing_answer).to be(true)
+    end
+
+    # Not knowing is not a warning: Meta answering nothing about the configuration says nothing
+    # about where this number is routed.
+    it 'is false when Meta did not answer the configuration' do
+      stub_health(nil)
+
+      expect(routing_answer).to be(false)
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/inboxes/{inbox.id}/register_webhook' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    end
+    let(:whatsapp_inbox) { create(:inbox, account: account, channel: whatsapp_channel) }
+    let(:phone_number_id) { whatsapp_channel.provider_config['phone_number_id'] }
+    let(:waba_id) { whatsapp_channel.provider_config['business_account_id'] }
+    let(:api_version) { 'v22.0' }
+    let(:subscription) do
+      stub_request(:post, "https://graph.facebook.com/#{api_version}/#{waba_id}/subscribed_apps")
+        .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    # The endpoint reads the routing back after the attempt, so every example here answers that read
+    # too. One stub covers both GETs because the factory gives the phone number and the business
+    # account the same id, and each formatter reads its own keys out of the body.
+    let(:health_api_version) { 'v24.0' }
+    let(:elsewhere_url) { 'https://elsewhere.example.com/webhooks/whatsapp/+123' }
+
+    def stub_health_read(phone_number_override)
+      stub_request(:get, %r{graph\.facebook\.com/#{health_api_version}/#{phone_number_id}})
+        .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: {
+          id: phone_number_id,
+          display_phone_number: '+1 234 567 8911',
+          webhook_configuration: { phone_number: phone_number_override }.compact,
+          name: 'WABA',
+          owner_business_info: { id: 'biz', name: 'Portfolio' }
+        }.to_json)
+    end
+
+    before do
+      allow(GlobalConfigService).to receive(:load).and_call_original
+      allow(GlobalConfigService).to receive(:load).with('WHATSAPP_API_VERSION', 'v22.0').and_return(api_version)
+      subscription
+      stub_health_read(elsewhere_url)
+    end
+
+    context 'when Meta accepts both calls' do
+      before do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'says the routing was applied' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to include('message' => 'Webhook registered successfully', 'callback_override_applied' => true)
+      end
+    end
+
+    # The refusal this endpoint has to describe: the WABA subscription lands, so Meta delivers,
+    # and the number is not pointed at this installation.
+    context 'when Meta refuses the per-number override' do
+      before do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+      end
+
+      it 'still succeeds, and says the routing was not applied' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to include('message' => 'Webhook registered successfully', 'callback_override_applied' => false)
+        expect(subscription).to have_been_requested
+      end
+
+      it 'leaves the channel authorized, which is what #568 fixed' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(whatsapp_channel.reload.reauthorization_required?).to be(false)
+      end
+    end
+
+    context 'when the subscription Meta needs fails' do
+      before do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{waba_id}/subscribed_apps")
+          .to_return(status: 400, body: { error: { message: 'App subscription to WABA failed' } }.to_json)
+      end
+
+      it 'answers the failure instead of a partial success' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('Webhook setup failed')
+        expect(response.parsed_body).not_to have_key('callback_override_applied')
+      end
+    end
+
+    # `callback_override_applied` answers one write, and a refusal, a 500 and a connection that
+    # closes with nothing to read all reach it as the same `false`. Where delivery goes afterwards
+    # is a different question, and the only authority on it is Meta, read back after the attempt.
+    context 'when the answer has to say where delivery goes' do
+      let(:expected_url) { "#{ENV.fetch('FRONTEND_URL', 'http://www.chatwoot.test')}/webhooks/whatsapp/#{whatsapp_channel.phone_number}" }
+
+      def register
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+        response.parsed_body
+      end
+
+      it 'reads the routing back when Meta refused the write, and answers what it found' do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+        stub_health_read(elsewhere_url)
+
+        body = register
+
+        expect(response).to have_http_status(:success)
+        expect(body['callback_override_applied']).to be(false)
+        expect(body['routing_read_back']).to be(true)
+        expect(body.dig('health', 'webhook_configuration', 'phone_number')).to eq(elsewhere_url)
+      end
+
+      # The case this endpoint could not describe: Meta stored the override and then answered 500.
+      # The write is not confirmed and the routing did change, so an answer derived from the write
+      # alone contradicts the card that is rendered from the read.
+      it 'answers the routing the write actually left, even though the write was not confirmed' do
+        # The fake Meta stores the override and only then fails, and the read answers what is
+        # stored at the moment it is asked. So a read taken before the write would answer the old
+        # URL, and this example is what pins the order rather than only the value.
+        stored = elsewhere_url
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return do
+            stored = expected_url
+            { status: 500, body: { error: { message: 'An unexpected error has occurred.', code: 1 } }.to_json }
+          end
+        stub_request(:get, %r{graph\.facebook\.com/#{health_api_version}/#{phone_number_id}})
+          .to_return do
+            { status: 200, headers: { 'Content-Type' => 'application/json' },
+              body: { id: phone_number_id, webhook_configuration: { phone_number: stored } }.to_json }
+          end
+
+        body = register
+
+        expect(body['callback_override_applied']).to be(false)
+        expect(body['routing_read_back']).to be(true)
+        expect(body.dig('health', 'webhook_configuration', 'phone_number')).to eq(expected_url)
+        expect(body.dig('health', 'routed_by_app_callback_only')).to be(false)
+      end
+
+      # The read is the addition, so it is the thing that must not cost anything: a write that
+      # landed cannot be reported as a failure because the read after it did not come back.
+      it 'says the routing is unknown when it could not be read back, and still answers 2xx' do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+        stub_request(:get, %r{graph\.facebook\.com/#{health_api_version}/}).to_return(status: 500, body: '{}')
+
+        body = register
+
+        expect(response).to have_http_status(:success)
+        expect(body['callback_override_applied']).to be(true)
+        expect(body['routing_read_back']).to be(false)
+        expect(body).not_to have_key('health')
+      end
+
+      # Two arrangements that differ only in what Meta did with the write, and a consumer that is
+      # not the dashboard has to be able to tell them apart.
+      it 'answers differently for a refused write and one that landed before the error' do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+        stub_health_read(elsewhere_url)
+        refused = register
+
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 500, body: { error: { message: 'An unexpected error has occurred.', code: 1 } }.to_json)
+        stub_health_read(expected_url)
+        landed = register
+
+        expect(refused['callback_override_applied']).to eq(landed['callback_override_applied'])
+        expect(refused.dig('health', 'webhook_configuration', 'phone_number'))
+          .not_to eq(landed.dig('health', 'webhook_configuration', 'phone_number'))
+      end
+    end
+
+    context 'when the user is not an administrator' do
+      it 'refuses' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
       end
     end
   end
@@ -2157,6 +2504,84 @@ RSpec.describe 'Inboxes API', type: :request do
 
         expect(response).to have_http_status(:ok)
       end
+    end
+  end
+
+  describe 'Twilio inbox health' do
+    let(:twilio_channel) { create(:channel_twilio_sms, :with_phone_number, account: account) }
+    let(:twilio_inbox) { create(:inbox, account: account, channel: twilio_channel) }
+    let(:health_service) { instance_double(Twilio::HealthService) }
+    let(:health_data) do
+      { status: 'misconfigured', webhooks: [{ name: 'messaging', configured: false }] }
+    end
+
+    let(:webhook_service) { instance_double(Twilio::WebhookSetupService, perform: true) }
+
+    before do
+      allow(Twilio::HealthService).to receive(:new).with(channel: twilio_channel).and_return(health_service)
+      allow(health_service).to receive(:perform).and_return(health_data)
+      allow(Twilio::WebhookSetupService).to receive(:new).with(channel: twilio_channel).and_return(webhook_service)
+    end
+
+    it 'returns the twilio webhook health' do
+      get "/api/v1/accounts/#{account.id}/inboxes/#{twilio_inbox.id}/health",
+          headers: admin.create_new_auth_token,
+          as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['status']).to eq('misconfigured')
+    end
+
+    it 'serializes the full health payload over http' do
+      allow(Twilio::HealthService).to receive(:new).with(channel: twilio_channel).and_call_original
+      twilio_client = instance_double(Twilio::REST::Client)
+      number = instance_double(Twilio::REST::Api::V2010::AccountContext::IncomingPhoneNumberInstance,
+                               sid: 'PN123', phone_number: twilio_channel.phone_number, friendly_name: 'Support line',
+                               capabilities: { 'voice' => false, 'sms' => true, 'mms' => true },
+                               sms_url: 'https://elsewhere.example.com/hook', sms_method: 'POST', sms_application_sid: nil)
+      allow(Twilio::REST::Client).to receive(:new).and_return(twilio_client)
+      allow(twilio_client).to receive(:incoming_phone_numbers).and_return(
+        instance_double(Twilio::REST::Api::V2010::AccountContext::IncomingPhoneNumberList, list: [number])
+      )
+      allow(twilio_client).to receive(:api).and_return(
+        instance_double(Twilio::REST::Api,
+                        accounts: instance_double(Twilio::REST::Api::V2010::AccountContext,
+                                                  fetch: instance_double(Twilio::REST::Api::V2010::AccountInstance,
+                                                                         sid: 'AC123', friendly_name: 'Acme Support',
+                                                                         status: 'active', type: 'Trial')))
+      )
+
+      get "/api/v1/accounts/#{account.id}/inboxes/#{twilio_inbox.id}/health",
+          headers: admin.create_new_auth_token,
+          as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body).to include(
+        'status' => 'misconfigured',
+        'voice_enabled' => false,
+        'account' => { 'sid' => 'AC123', 'friendly_name' => 'Acme Support', 'status' => 'active', 'type' => 'Trial' }
+      )
+      expect(response.parsed_body['sender']).to include('type' => 'phone_number', 'label' => twilio_channel.phone_number)
+      expect(response.parsed_body['webhooks'].first).to include('name' => 'messaging', 'configured' => false, 'reason' => 'url_mismatch')
+    end
+
+    it 'returns bad request for a twilio whatsapp inbox' do
+      whatsapp_medium_inbox = create(:inbox, account: account, channel: create(:channel_twilio_sms, :whatsapp, account: account))
+
+      get "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_medium_inbox.id}/health",
+          headers: admin.create_new_auth_token,
+          as: :json
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it 'registers the messaging webhook' do
+      post "/api/v1/accounts/#{account.id}/inboxes/#{twilio_inbox.id}/register_webhook",
+           headers: admin.create_new_auth_token,
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(webhook_service).to have_received(:perform)
     end
   end
 end

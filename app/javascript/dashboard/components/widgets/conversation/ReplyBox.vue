@@ -1,12 +1,12 @@
 <script>
-import { defineAsyncComponent, useTemplateRef } from 'vue';
+import { defineAsyncComponent, getCurrentInstance, useTemplateRef } from 'vue';
 import { mapGetters } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useInboxSignatures } from 'dashboard/composables/useInboxSignatures';
 import { useTrack } from 'dashboard/composables';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
-import keyboardEventListenerMixins from 'shared/mixins/keyboardEventListenerMixins';
+import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
 
 import ReplyToMessage from './ReplyToMessage.vue';
 import AttachmentPreview from 'dashboard/components/widgets/AttachmentsPreview.vue';
@@ -20,11 +20,17 @@ import MessageSignatureMissingAlert from './MessageSignatureMissingAlert.vue';
 import ReplyBoxBanner from './ReplyBoxBanner.vue';
 import QuotedEmailPreview from './QuotedEmailPreview.vue';
 import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/constants';
+
+// How many mode switches a capture may still be uploading across before the composer stops
+// holding an explanation for it. Nothing survives five, and the cap is what keeps a marker
+// nobody claims from sitting in a component that stays mounted all day.
+const MAX_PENDING_DISCARD_MARKERS = 5;
 import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor.vue';
 import AudioRecorder from 'dashboard/components/widgets/WootWriter/AudioRecorder.vue';
 import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { CMD_AI_ASSIST } from 'dashboard/helper/commandbar/events';
+import { usableFilesFromTransfer } from 'dashboard/helper/pastedFiles';
 import {
   getMessageVariables,
   getUndefinedVariablesInMessage,
@@ -91,7 +97,7 @@ export default {
     ScheduledMessageModal,
     ConversationResolveAttributesModal,
   },
-  mixins: [inboxMixin, fileUploadMixin, keyboardEventListenerMixins],
+  mixins: [inboxMixin, fileUploadMixin],
   emits: ['toggleEditorSize'],
   setup() {
     const {
@@ -112,11 +118,46 @@ export default {
 
     const { formatMessage } = useMessageFormatter();
 
-    const replyEditor = useTemplateRef('replyEditor');
     const messageEditor = useTemplateRef('messageEditor');
     const copilot = useCopilotReply();
     const macroExecution = useMacroExecution();
     const shortcutKey = useKbd(['$mod', '+', 'enter']);
+
+    // Options API state and methods live on the instance proxy
+    const { proxy } = getCurrentInstance();
+    useKeyboardEvents({
+      Escape: {
+        action: () => proxy.hideEmojiPicker(),
+        allowOnFocusedInput: true,
+      },
+      '$mod+KeyK': {
+        action: e => {
+          e.preventDefault();
+          const ninja = document.querySelector('ninja-keys');
+          ninja.open();
+        },
+        allowOnFocusedInput: true,
+      },
+      Enter: {
+        action: e => {
+          if (proxy.isAValidEvent('enter')) {
+            proxy.onSendReply();
+            e.preventDefault();
+          }
+        },
+        allowOnFocusedInput: true,
+      },
+      '$mod+Enter': {
+        action: () => {
+          if (copilot.isActive.value && proxy.isFocused) {
+            proxy.onSubmitCopilotReply();
+          } else if (proxy.isAValidEvent('cmd_enter')) {
+            proxy.onSendReply();
+          }
+        },
+        allowOnFocusedInput: true,
+      },
+    });
 
     return {
       uiSettings,
@@ -126,7 +167,6 @@ export default {
       fetchQuotedReplyFlagFromUISettings,
       getSignatureForInbox,
       getSignatureSettingsForInbox,
-      replyEditor,
       messageEditor,
       copilot,
       shortcutKey,
@@ -145,6 +185,15 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
+      // The generations ended by a mode change that nobody has been told about yet. A
+      // capture carries the generation it was staged under, so the answer it is owed is a
+      // fact about that generation and not about the latest one -- one slot cannot hold two
+      // outstanding captures, and cannot tell an unanswered marker from a stale one.
+      //
+      // Bounded, because ReplyBox stays mounted for the whole session and an entry nothing
+      // ever claims would otherwise sit here for good: past a handful of mode switches a
+      // capture is not still uploading.
+      composerDropGenerations: [],
       // The recorder's capture starts when the mic is armed, not when the file
       // shows up: talking and then converting to MP3 both happen in between.
       recordingGeneration: 0,
@@ -159,6 +208,7 @@ export default {
       toEmails: '',
       doAutoSaveDraft: () => {},
       showWhatsAppTemplatesModal: false,
+      requestContactInfoTemplatesOnly: false,
       showContentTemplatesModal: false,
       updateEditorSelectionWith: '',
       undefinedVariableMessage: '',
@@ -203,6 +253,11 @@ export default {
     // switching between the two threads kept the first inbox's answer.
     groupMembersFetchTarget() {
       if (!this.groupContactId || !this.isGroupConversation) return null;
+      // `groups` and not `group_management`: this fetch reads the GroupMember rows the
+      // inbound path already filed, through Chatwoot's own API, and never reaches the
+      // provider. Asking for the command surface here would leave a receive-only inbox
+      // without `is_inbox_admin`, and an announcement-only group would look replyable
+      // until the server refused the message.
       if (!this.hasInboxCapability(CAPABILITIES.GROUPS)) return null;
 
       return `${this.groupContactId}:${this.currentChat?.inbox_id}`;
@@ -678,7 +733,7 @@ export default {
     },
     conversationIdByRoute(conversationId, oldConversationId) {
       if (conversationId !== oldConversationId) {
-        this.composerGeneration += 1;
+        this.advanceComposerGeneration();
         this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
       }
@@ -713,15 +768,25 @@ export default {
         mode: updatedReplyType,
       });
       this.switchDraftContext(this.conversationIdByRoute, updatedReplyType);
-      // The composer can leave note mode without the agent touching anything: a
-      // bot releases the pending conversation it owned, the messaging window
-      // reopens, an Instagram restriction lifts. Whatever is staged was produced
-      // under the old privacy but would be sent under the new one, so a voice
-      // note recorded for the team could reach the contact. The draft survives
-      // because switchDraftContext keeps one per mode; attachments and a cited
-      // private note have no such split, so they go.
-      this.composerGeneration += 1;
+      // The composer can change mode without the agent touching anything: a bot releases
+      // the pending conversation it owned, the messaging window reopens, an Instagram
+      // restriction lifts. Whatever is staged was produced under the old privacy but would
+      // be sent under the new one, so a voice note recorded for the team could reach the
+      // contact. The draft survives because switchDraftContext keeps one per mode;
+      // attachments and a cited private note have no such split, so they go.
+      //
+      // Every path arrives here, whoever caused it: the composer cannot tell the agent
+      // picking Reply from a bot releasing the conversation under them, and the message is
+      // worth having either way, since what it reports is a file that will not be sent.
+      // What it must not do is claim the contact was about to receive it, which is false in
+      // one of the two directions.
+      //
+      // The announcement comes first, and the clearing is all done here rather than by the
+      // callers: emptying the composer before the mode changes leaves this with nothing to
+      // report, which is how a staged attachment and then a recording each stayed silent.
+      this.advanceComposerGeneration(true);
       if (this.isRecordingAudio) this.onTypingOff();
+      this.isRecordingAudio = false;
       this.resetRecorderAndClearAttachments();
       if (this.inReplyTo?.private && !this.isOnPrivateNote) {
         this.resetReplyToMessage();
@@ -741,10 +806,9 @@ export default {
       this.conversationIdByRoute,
       this.effectiveReplyMode
     );
-    // Don't use the keyboard listener mixin here as the events here are supposed to be
-    // working even if the editor is focussed.
+    // Bound directly rather than through useKeyboardEvents, because this has to
+    // keep working even while the editor is focussed.
     document.addEventListener('paste', this.onPaste);
-    document.addEventListener('keydown', this.handleKeyEvents);
     this.setCCAndToEmailsFromLastChat();
     this.doAutoSaveDraft = debounce(
       () => {
@@ -764,14 +828,11 @@ export default {
       BUS_EVENTS.NEW_CONVERSATION_MODAL,
       this.onNewConversationModalActive
     );
-    emitter.on(BUS_EVENTS.INSERT_INTO_NORMAL_EDITOR, this.addIntoEditor);
     emitter.on(CMD_AI_ASSIST, this.executeCopilotAction);
   },
   unmounted() {
     document.removeEventListener('paste', this.onPaste);
-    document.removeEventListener('keydown', this.handleKeyEvents);
     emitter.off(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.onReplyToMessage);
-    emitter.off(BUS_EVENTS.INSERT_INTO_NORMAL_EDITOR, this.addIntoEditor);
     emitter.off(
       BUS_EVENTS.NEW_CONVERSATION_MODAL,
       this.onNewConversationModalActive
@@ -779,6 +840,10 @@ export default {
     emitter.off(CMD_AI_ASSIST, this.executeCopilotAction);
   },
   methods: {
+    openContactInfoTemplateModal() {
+      this.requestContactInfoTemplatesOnly = true;
+      this.showWhatsAppTemplatesModal = true;
+    },
     getDraftKey(
       conversationId = this.conversationIdByRoute,
       replyType = this.effectiveReplyMode
@@ -893,46 +958,6 @@ export default {
         this.$store.dispatch('draftMessages/delete', { key });
       }
     },
-    getElementToBind() {
-      return this.replyEditor;
-    },
-    getKeyboardEvents() {
-      return {
-        Escape: {
-          action: () => {
-            this.hideEmojiPicker();
-          },
-          allowOnFocusedInput: true,
-        },
-        '$mod+KeyK': {
-          action: e => {
-            e.preventDefault();
-            const ninja = document.querySelector('ninja-keys');
-            ninja.open();
-          },
-          allowOnFocusedInput: true,
-        },
-        Enter: {
-          action: e => {
-            if (this.isAValidEvent('enter')) {
-              this.onSendReply();
-              e.preventDefault();
-            }
-          },
-          allowOnFocusedInput: true,
-        },
-        '$mod+Enter': {
-          action: () => {
-            if (this.copilot.isActive.value && this.isFocused) {
-              this.onSubmitCopilotReply();
-            } else if (this.isAValidEvent('cmd_enter')) {
-              this.onSendReply();
-            }
-          },
-          allowOnFocusedInput: true,
-        },
-      };
-    },
     isAValidEvent(selectedKey) {
       return (
         !this.showUserMentions &&
@@ -966,9 +991,16 @@ export default {
       // NOTE: Don't handle paste if scheduled message modal is open
       if (this.showScheduledMessageModal) return;
 
-      // Filter valid files (non-zero size)
-      Array.from(e.clipboardData.files)
-        .filter(file => file.size > 0)
+      // An empty file is refused at every other entry point, so it is refused here too. The
+      // helper decides whether to say it out loud: a rich copy (a spreadsheet cell) brings an
+      // invalid zero-byte attachment along with its text, and warning about that one would fire
+      // on an ordinary paste, about a file nobody chose.
+      const { files, shouldAlertEmpty } = usableFilesFromTransfer(
+        e.clipboardData
+      );
+      if (shouldAlertEmpty) useAlert(this.$t('CONVERSATION.FILE_IS_EMPTY'));
+
+      files
         .filter(file => {
           const isAllowed = isFileTypeAllowedForChannel(file, {
             channelType: this.channelType || this.inbox?.channel_type,
@@ -1015,10 +1047,12 @@ export default {
       }
     },
     openWhatsappTemplateModal() {
+      this.requestContactInfoTemplatesOnly = false;
       this.showWhatsAppTemplatesModal = true;
     },
     hideWhatsappTemplatesModal() {
       this.showWhatsAppTemplatesModal = false;
+      this.requestContactInfoTemplatesOnly = false;
     },
     openContentTemplateModal() {
       this.showContentTemplatesModal = true;
@@ -1189,15 +1223,12 @@ export default {
       }, 100);
     },
     setReplyMode(mode = REPLY_EDITOR_MODES.REPLY) {
-      // Clear attachments when switching between private note and reply modes
-      // This is to prevent from breaking the upload rules
-      if (this.attachedFiles.length > 0) this.attachedFiles = [];
-
+      // The clearing lives in the effectiveReplyMode watcher and only there. It ran here
+      // too, ahead of the mode actually changing, so by the time the watcher looked there
+      // was nothing left to report -- and it ran even when the mode did not change at all,
+      // since `replyType` is only assigned below when a public reply is possible.
       this.$store.dispatch('draftMessages/setReplyEditorMode', { mode });
       if (this.canSendPublicReply) this.replyType = mode;
-      if (this.isRecordingAudio) {
-        this.toggleAudioRecorder();
-      }
     },
     clearEditorSelection() {
       this.updateEditorSelectionWith = '';
@@ -1213,7 +1244,7 @@ export default {
       // Sending consumes the composer as much as switching mode does: a capture
       // still uploading belongs to the message that just left, and would
       // otherwise land in the empty composer and ride along with the next one.
-      this.composerGeneration += 1;
+      this.advanceComposerGeneration();
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
@@ -1325,10 +1356,64 @@ export default {
       }
       this.onFileUpload(file);
     },
+    advanceComposerGeneration(announceable = false) {
+      // Whatever is already staged is discarded right here, by the reset that follows, so
+      // it is said now. Waiting for an upload callback loses every capture that had already
+      // finished, which is the ordinary shape of this: the recording is sitting in the
+      // composer when the bot hands the conversation back.
+      // Only a capture still uploading needs a marker, and only until it lands. Each is
+      // kept beside the others rather than replacing them: a marker belongs to whatever was
+      // staged under that generation, and a later transition has no business answering, or
+      // silencing, an earlier one.
+      if (announceable && !this.announceVisibleDiscard()) {
+        this.composerDropGenerations.push(this.composerGeneration);
+        if (this.composerDropGenerations.length > MAX_PENDING_DISCARD_MARKERS) {
+          this.composerDropGenerations.shift();
+        }
+      }
+      this.composerGeneration += 1;
+    },
+    announceVisibleDiscard() {
+      const staged = this.attachedFiles;
+      if (!staged.length && !this.isRecordingAudio) return false;
+
+      this.announceDiscard(
+        this.isRecordingAudio || staged.some(file => file.isVoiceMessage)
+      );
+      return true;
+    },
+    // A capture that arrives for a composer that has moved on is thrown away, and the agent
+    // is told only when they have no way of working out why on their own.
+    //
+    // Leaving note mode is that case: nothing the agent did causes it — a bot releases the
+    // conversation it owned, the messaging window reopens, an Instagram restriction lifts —
+    // so what they staged disappears with the composer looking untouched. Navigating away
+    // and sending are their own actions, with the composer visibly resetting in front of
+    // them, and an alert on those is noise on the ordinary case.
+    //
+    // The marker is consumed, so a batch staged together and invalidated by one transition
+    // is one message rather than a stack of identical ones.
+    discardStagedCapture(file, generation) {
+      const marker = this.composerDropGenerations.indexOf(generation);
+      if (marker === -1) return;
+
+      this.composerDropGenerations.splice(marker, 1);
+      this.announceDiscard(Boolean(file?.isVoiceMessage));
+    },
+    announceDiscard(isRecording) {
+      useAlert(
+        isRecording
+          ? this.$t('CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE')
+          : this.$t('CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE')
+      );
+    },
     attachFile({ blob, file }) {
       const generation = file?.composerGeneration;
       // Checked here so a stale recording can't clear a newer one below.
-      if (generation !== this.composerGeneration) return;
+      if (generation !== this.composerGeneration) {
+        this.discardStagedCapture(file, generation);
+        return;
+      }
 
       if (file?.isVoiceMessage) {
         this.removeRecordedAudio();
@@ -1342,7 +1427,10 @@ export default {
         // Reading the file is async as well, so the mode can change between the
         // two. The push is the only moment that decides what gets sent, so it is
         // where the capture has to still be current.
-        if (generation !== this.composerGeneration) return;
+        if (generation !== this.composerGeneration) {
+          this.discardStagedCapture(file, generation);
+          return;
+        }
 
         this.attachedFiles.push({
           currentChatId: this.currentChat.id,
@@ -1562,7 +1650,7 @@ export default {
 
 <template>
   <ReplyBoxBanner :message="message" :is-on-private-note="isOnPrivateNote" />
-  <div ref="replyEditor" class="reply-box" :class="replyBoxClass">
+  <div class="reply-box" :class="replyBoxClass">
     <ReplyTopPanel
       :mode="replyType"
       :conversation-id="conversationId"
@@ -1653,6 +1741,7 @@ export default {
           :update-selection-with="updateEditorSelectionWith"
           :min-height="4"
           :disabled="isEditorDisabled"
+          enable-insert-events
           :enable-macros="isMacrosEnabled"
           enable-variables
           :variables="messageVariables"
@@ -1760,6 +1849,7 @@ export default {
         @toggle-insert-article="toggleInsertArticle"
         @toggle-quoted-reply="toggleQuotedReply"
         @schedule-message="openScheduledMessageModal"
+        @request-contact-info-template="openContactInfoTemplateModal"
       />
     </Transition>
 
@@ -1767,6 +1857,7 @@ export default {
       :inbox-id="inbox.id"
       :show="showWhatsAppTemplatesModal"
       :send-rendered-content="isAPIInbox"
+      :request-contact-info-only="requestContactInfoTemplatesOnly"
       @close="hideWhatsappTemplatesModal"
       @on-send="onSendWhatsAppReply"
       @cancel="hideWhatsappTemplatesModal"

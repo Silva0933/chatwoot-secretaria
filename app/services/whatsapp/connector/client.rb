@@ -69,9 +69,18 @@ class Whatsapp::Connector::Client
 
   # Fire and forget: the command is queued for the session's owner. Failures come back
   # later as a command.failed event.
-  def publish(payload, idempotency_key: nil)
+  #
+  # Nobody here is waiting to give up on it, so whatever ceiling it carries is the only
+  # one it gets, and without either the command runs for as long as it takes while the
+  # session's executor -- which takes one command at a time -- holds everything behind it.
+  #
+  # `timeout` is how long the command is still worth running at all, counted from now:
+  # past it the connector refuses it unrun. `max_runtime` is how long it may take once
+  # started, and says nothing about arriving late. A command that must be carried out
+  # whenever it arrives takes the second alone.
+  def publish(payload, idempotency_key: nil, timeout: nil, max_runtime: nil)
     ensure_readable!
-    command = build(payload, idempotency_key: idempotency_key)
+    command = build(payload, idempotency_key: idempotency_key, timeout: timeout, max_runtime: max_runtime)
     write(command_stream, command)
     command.id
   end
@@ -79,14 +88,24 @@ class Whatsapp::Connector::Client
   # Queues the command and waits for the answer the owner pushes back.
   def call(payload, timeout: RPC_TIMEOUT, idempotency_key: nil)
     ensure_available!
-    command = build(payload, idempotency_key: idempotency_key, reply_to: true, timeout: timeout)
+    command = build(payload, idempotency_key: idempotency_key, reply_to: true, timeout: timeout - DEADLINE_MARGIN)
     write(command_stream, command)
     await(command, timeout)
   end
 
-  # Session-agnostic commands (wake, ping): any live instance answers.
-  def control(payload, timeout: RPC_TIMEOUT)
-    command = build(payload, reply_to: model::Commands.rpc?(payload.class.wire_type), timeout: timeout)
+  # Commands that go to the fleet rather than to one session's owner: a wake, a ping, and
+  # the teardown of a session nobody is running.
+  #
+  # Guarded like `publish` and for the same reason, which used to be covered by accident:
+  # the only caller was `connect`, whose `call` right after raises before anything reads
+  # the wake. A fire-and-forget command written here is the whole of what the caller does,
+  # and a connector that is up and speaks another protocol consumes the frame and drops it
+  # while the caller is told it was queued -- which for a teardown is a device left listed
+  # on somebody's phone with nothing anywhere saying so.
+  def control(payload, timeout: RPC_TIMEOUT, max_runtime: nil)
+    ensure_readable!
+    rpc = model::Commands.rpc?(payload.class.wire_type)
+    command = build(payload, reply_to: rpc, timeout: (timeout - DEADLINE_MARGIN if rpc), max_runtime: max_runtime)
     write(Whatsapp::Connector.key('control'), command)
     return command.id unless command.reply_to
 
@@ -147,14 +166,22 @@ class Whatsapp::Connector::Client
     Whatsapp::Connector.key('cmd', session_id)
   end
 
-  def build(payload, idempotency_key: nil, reply_to: false, timeout: RPC_TIMEOUT)
+  # `timeout` is the whole budget the command declares, already net of any margin its
+  # caller wanted: an RPC hands over less than it will wait, a published command hands
+  # over what the command is worth, and either can hand over nothing. It becomes the
+  # frame's `deadline`, an instant, which is why the clock starts here rather than when
+  # the owner picks the command up.
+  #
+  # `max_runtime` is the other ceiling, and both are seconds. It becomes a duration on the
+  # frame and the connector starts counting it when the work does, so queueing time never
+  # eats into it: that is what lets a command be bounded without also being droppable.
+  def build(payload, idempotency_key: nil, reply_to: false, timeout: nil, max_runtime: nil)
     id = SecureRandom.uuid
     now = (Time.current.to_f * 1000).round
     attributes = { id: id, sid: session_id, ts: now, idempotency_key: idempotency_key }
-    if reply_to
-      attributes[:reply_to] = reply_key(id)
-      attributes[:deadline] = now + ((timeout - DEADLINE_MARGIN) * 1000)
-    end
+    attributes[:reply_to] = reply_key(id) if reply_to
+    attributes[:deadline] = now + (timeout * 1000).round if timeout
+    attributes[:max_runtime_ms] = (max_runtime * 1000).round if max_runtime
     model::Command.build(payload, **attributes)
   end
 

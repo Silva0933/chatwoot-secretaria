@@ -29,6 +29,7 @@ import CustomerSatisfactionPage from './settingsPage/CustomerSatisfactionPage.vu
 import CollaboratorsPage from './settingsPage/CollaboratorsPage.vue';
 import BotConfiguration from './components/BotConfiguration.vue';
 import AccountHealth from './components/AccountHealth.vue';
+import TwilioHealth from './components/TwilioHealth.vue';
 import WhatsappManualMigrationDialog from './components/WhatsappManualMigrationDialog.vue';
 import WhatsappManualMigrationBanner from './components/WhatsappManualMigrationBanner.vue';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
@@ -37,8 +38,11 @@ import LockToSingleConversationPreview from './components/LockToSingleConversati
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import SpinnerLoader from 'dashboard/components-next/spinner/Spinner.vue';
 import ConvertInboxModal from 'dashboard/components/widgets/modal/ConvertInboxModal.vue';
-import { INBOX_TYPES } from 'dashboard/helper/inbox';
-import { getInboxIconByType } from 'dashboard/helper/inbox';
+import {
+  getInboxIconByType,
+  getInboxIdentifier,
+  INBOX_TYPES,
+} from 'dashboard/helper/inbox';
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { LocalStorage } from 'shared/helpers/localStorage';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
@@ -82,6 +86,7 @@ export default {
     ColorPicker,
     SelectInput,
     AccountHealth,
+    TwilioHealth,
     WhatsappManualMigrationDialog,
     WhatsappManualMigrationBanner,
     Widget,
@@ -160,8 +165,15 @@ export default {
     selectedTabKey() {
       return this.tabs[this.selectedTabIndex]?.key;
     },
+    // AccountHealth renders the structured provider error; TwilioHealth only needs the message.
+    healthErrorMessage() {
+      return this.healthError?.message || '';
+    },
     shouldShowWhatsAppConfiguration() {
       return this.isAWhatsAppCloudChannel;
+    },
+    shouldShowTwilioHealth() {
+      return this.isATwilioChannel && this.inbox.medium === 'sms';
     },
     whatsAppAPIProviderName() {
       if (this.isAWhatsAppCloudChannel) {
@@ -266,6 +278,16 @@ export default {
         ];
       }
 
+      if (this.shouldShowTwilioHealth) {
+        visibleToAllChannelTabs = [
+          ...visibleToAllChannelTabs,
+          {
+            key: 'twilio-health',
+            name: this.$t('INBOX_MGMT.TABS.ACCOUNT_HEALTH'),
+          },
+        ];
+      }
+
       if (
         this.isATwilioChannel &&
         this.inbox.phone_number &&
@@ -326,18 +348,10 @@ export default {
       return 'max-w-7xl';
     },
     inboxName() {
-      if (this.isATwilioSMSChannel || this.isATwilioWhatsAppChannel) {
-        return `${this.inbox.name} (${
-          this.inbox.messaging_service_sid || this.inbox.phone_number
-        })`;
-      }
-      if (this.isAWhatsAppChannel) {
-        return `${this.inbox.name} (${this.inbox.phone_number})`;
-      }
-      if (this.isAnEmailChannel) {
-        return `${this.inbox.name} (${this.inbox.email})`;
-      }
       return this.inbox.name;
+    },
+    inboxIdentifier() {
+      return getInboxIdentifier(this.inbox);
     },
     canLocktoSingleConversation() {
       return (
@@ -417,11 +431,6 @@ export default {
       return (
         this.isAWhatsAppCloudChannel &&
         this.isEmbeddedSignupWhatsApp &&
-        (!this.isOnChatwootCloud ||
-          this.isFeatureEnabledonAccount(
-            this.accountId,
-            FEATURE_FLAGS.WHATSAPP_EMBEDDED_SIGNUP_FLOW
-          )) &&
         this.inbox.reauthorization_required
       );
     },
@@ -604,15 +613,21 @@ export default {
     async fetchHealthData() {
       if (!this.inbox) return;
 
-      if (!this.isAWhatsAppCloudChannel) {
+      if (!this.isAWhatsAppCloudChannel && !this.shouldShowTwilioHealth) {
         return;
       }
 
       try {
         this.isLoadingHealth = true;
-        this.healthError = null;
+        // Cleared with the answer, not before asking. Until #593 there was nothing to press in the
+        // error state, so the gap between the two never had a viewer; now the operator presses
+        // Register, the re-read starts, and clearing the error here would drop the screen into the
+        // "nothing is known" state for as long as the read takes, which with a quiet Meta is the
+        // whole 10s ceiling: the error card, the provider message and the button all disappear and
+        // come back.
         const response = await InboxHealthAPI.getHealthStatus(this.inbox.id);
         this.healthData = response.data;
+        this.healthError = null;
       } catch (error) {
         const apiError = error.response?.data?.error;
         this.healthError =
@@ -639,10 +654,33 @@ export default {
 
       try {
         this.isRegisteringWebhook = true;
-        await InboxHealthAPI.registerWebhook(this.inbox.id);
-        useAlert(this.$t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS'));
-        await this.fetchHealthData();
+        const { data } = await InboxHealthAPI.registerWebhook(this.inbox.id);
+        // Meta refuses the per-number override for a whole class of accounts, and that refusal no
+        // longer takes the channel down, so a plain success here would be the only thing the
+        // operator sees about a write that did not land. The flag is about that write and nothing
+        // else: it reads `false` for a refusal, for a 500 and for a connection that closed, so the
+        // sentence sends the reader to the card instead of claiming where delivery goes.
+        useAlert(
+          data?.callback_override_applied === false
+            ? this.$t(
+                'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS_WITHOUT_ROUTING'
+              )
+            : this.$t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS')
+        );
+        // The answer already carries the routing Meta reported after the write, so the card comes
+        // from it instead of a second round trip. When that read did not come back the field says
+        // so, and then the card is fetched rather than left showing what it had before the press.
+        if (data?.routing_read_back) {
+          // The error has to go with it. Until #593 the screen could not be repaired from the error
+          // state at all, so nothing ever reached this line holding a stale failure; now it can,
+          // and leaving `healthError` set would keep the error card over a reading that came back.
+          this.healthData = data.health;
+          this.healthError = null;
+        } else {
+          await this.fetchHealthData();
+        }
       } catch (error) {
+        // Same as the health fetch: the provider's own message is the actionable part.
         useAlert(
           error.response?.data?.error ||
             error.message ||
@@ -813,6 +851,7 @@ export default {
     <SettingIntroBanner
       :header-image="inbox.avatarUrl"
       :header-title="inboxName"
+      :header-identifier="inboxIdentifier"
     >
       <woot-tabs
         class="[&_ul]:p-0 top-px relative"
@@ -1482,6 +1521,15 @@ export default {
             :is-registering-webhook="isRegisteringWebhook"
             @register-webhook="registerWebhook"
             @go-to-configuration="goToWhatsAppConfiguration"
+          />
+        </div>
+        <div v-if="selectedTabKey === 'twilio-health'">
+          <TwilioHealth
+            :health-data="healthData"
+            :is-loading="isLoadingHealth"
+            :error="healthErrorMessage"
+            :is-registering-webhook="isRegisteringWebhook"
+            @register-webhook="registerWebhook"
           />
         </div>
         <WhatsappManualMigrationDialog

@@ -73,6 +73,54 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
     expect(WebMock).not_to have_requested(:post, 'https://evil.test/x')
   end
 
+  # `Net::HTTP` retries an idempotent request once by default, so the ceilings this class
+  # advertises were worth half of what they read as on every `get`: measured against a
+  # socket that accepts and never answers, a GET at `read_timeout: 3` took 6.0s, and 3.0s
+  # once the retry was closed. One of those `get`s runs inside the pairing poll, so the
+  # doubling landed on a loop that is already waiting.
+  #
+  # Both transports, because which one runs is decided by a deployment variable and the
+  # ceiling cannot depend on that.
+  describe 'the second axis of the ceiling' do
+    it 'closes the retry on the filtered transport' do
+      options = nil
+      allow(SsrfFilter).to receive(:get) do |_uri, **kwargs|
+        options = kwargs[:http_options]
+        instance_double(Net::HTTPOK, code: '200', body: '{}')
+      end
+
+      client.get('/instance/status')
+
+      expect(options).to include(max_retries: 0)
+    end
+
+    it 'closes the retry on the private-network transport' do
+      options = nil
+      allow(HTTParty).to receive(:get) do |_url, **kwargs|
+        options = kwargs
+        instance_double(HTTParty::Response, code: 200, body: '{}')
+      end
+
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['10.0.0.5'])
+      with_modified_env SAFE_FETCH_ALLOW_PRIVATE_NETWORK: 'true' do
+        client.get('/instance/status')
+      end
+
+      expect(options).to include(max_retries: 0)
+    end
+
+    # A fence, not a checklist. The two examples above each hold one transport, and they
+    # hold nothing about a third: this class picks its transport from a deployment
+    # variable, so a call added outside `direct` and `filtered` would carry neither
+    # ceiling and no example here would notice.
+    it 'reaches the network in those two places and nowhere else' do
+      source = File.read(Rails.root.join('app/services/whatsapp/session/backends/uazapi/client.rb'))
+
+      expect(source.scan('HTTParty.').size).to eq(1)
+      expect(source.scan('SsrfFilter.public_send').size).to eq(1)
+    end
+  end
+
   describe 'what it makes of a failure' do
     # The class decides what the caller does next: a retryable error keeps an outbound
     # message in the queue, a non-retryable one puts the reason in front of the agent.
@@ -108,6 +156,29 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
 
       expect { client.get('/instance/status') }.to raise_error(errors::NotSupported, /Method Not Allowed/) do |raised|
         expect(raised.message).not_to include('instance-token')
+      end
+    end
+
+    # Measured against the live instance on 10/09/2026: a refused group description answers
+    # `{"error":"Description cannot be empty"}`. This provider puts refusals under `error`
+    # and reports under `message`, and reading only `message` left the operator with a bare
+    # status on exactly the answers that carried a reason.
+    it 'quotes the reason when the provider files it under error' do
+      stub_request(:post, 'https://uazapi.test/group/updateDescription')
+        .to_return(status: 400, body: { error: 'Description cannot be empty' }.to_json)
+
+      expect { client.post('/group/updateDescription') }
+        .to raise_error(errors::InvalidPayload, /Description cannot be empty/)
+    end
+
+    # Nothing to say is still nothing to say: a body with neither key must not turn into a
+    # trailing colon with a blank after it.
+    it 'says only what happened when the body carries no words' do
+      stub_request(:get, 'https://uazapi.test/instance/status')
+        .to_return(status: 400, body: { data: { token: 'instance-token' } }.to_json)
+
+      expect { client.get('/instance/status') }.to raise_error(errors::InvalidPayload) do |raised|
+        expect(raised.message).to end_with('answered 400')
       end
     end
 

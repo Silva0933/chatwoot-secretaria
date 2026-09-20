@@ -51,6 +51,61 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
   it_behaves_like 'a whatsapp session backend'
 
+  # The connector fails the command when nothing was carried out. This reaches the same
+  # verdict from the rows, so a caller told `ok` and handed a refusal for every
+  # participant it named gets the error both controllers already turn into a message an
+  # operator reads, rather than a silent success.
+  describe 'a participants update the provider refused' do
+    let(:command) do
+      model::Commands::GroupParticipantsUpdate.new(
+        group: model::Address.group('120363040000000001'),
+        participants: [model::Address.phone('5541999990000')], action: 'remove'
+      )
+    end
+
+    it 'raises when every participant was refused' do
+      results['group.participants.update'] = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'failed',
+          'code' => 'group_participant_not_allowed' }
+      ]
+
+      expect { backend.update_group_participants(command) }
+        .to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+    end
+
+    # Reporting the participants that were added as not added is a worse answer, and the
+    # caller reads the rows to find out which is which.
+    it 'hands back a partial refusal rather than failing the command' do
+      rows = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'success', 'code' => nil },
+        { 'address' => { 'kind' => 'phone', 'id' => '5541988887777' }, 'status' => 'failed',
+          'code' => 'group_participant_not_allowed' }
+      ]
+      results['group.participants.update'] = rows
+
+      expect(backend.update_group_participants(command)).to eq(rows)
+    end
+
+    # An answer with no rows in it refused nobody. Reading it as a refusal for everyone
+    # named would fail a command the provider carried out.
+    it 'treats an answer with no rows as nothing refused' do
+      results['group.participants.update'] = []
+
+      expect { backend.update_group_participants(command) }.not_to raise_error
+    end
+
+    # Any other refusal is the connector's to name: it fails the command itself when the
+    # code is one it maps, and a code this build does not know must not be read as the
+    # one it happens to rescue.
+    it 'leaves a refusal it does not recognise alone' do
+      results['group.participants.update'] = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'failed', 'code' => 'internal' }
+      ]
+
+      expect { backend.update_group_participants(command) }.not_to raise_error
+    end
+  end
+
   it 'declares exactly what the registry advertises for the provider' do
     expect(described_class.capabilities).to eq(Whatsapp::Session::Registry.descriptor('native').capabilities)
   end
@@ -70,6 +125,54 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(client).to have_received(:call).ordered
   end
 
+  # A connector reads a session's own command stream only while it is running that
+  # session, so a teardown written there for an account nobody has adopted reaches no
+  # connector at all and dies when the stream is trimmed -- which is the state an inbox is
+  # most often destroyed in. The control stream is read by every instance.
+  it 'asks for the session to be deleted on the control stream, where an account nobody runs is still reachable' do
+    backend.delete_session
+
+    expect(client).to have_received(:control)
+      .with(an_instance_of(model::Commands::SessionDelete), max_runtime: described_class::TEARDOWN_RUNTIME)
+    expect(client).not_to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete), any_args)
+  end
+
+  # The pairing is what outlives the inbox: a device stays listed on the customer's phone
+  # with nothing in Chatwoot corresponding to it. Delivery through the control stream is
+  # to some instance rather than to the one running the account, so for a session that is
+  # up the unlink rides the owner's own stream and happens at once.
+  it 'unlinks the device on the session stream before it asks for the session to be deleted' do
+    backend.delete_session
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::SessionLogout), max_runtime: described_class::TEARDOWN_RUNTIME).ordered
+    expect(client).to have_received(:control)
+      .with(an_instance_of(model::Commands::SessionDelete), max_runtime: described_class::TEARDOWN_RUNTIME).ordered
+  end
+
+  # The connector answers a teardown it could not carry out with `command.failed`, and
+  # that event is routed to an inbox by `session_id`: this inbox is being destroyed, so
+  # the lookup misses and the event is dropped as an orphan. What is written here is the
+  # last thing about the session anybody can see.
+  it 'writes down what it asked for, because the failure has nowhere to be reported' do
+    allow(Rails.logger).to receive(:info)
+
+    backend.delete_session
+
+    # The command ids too: they are what ties this line to the connector's own log, which
+    # is the only other place a teardown that failed leaves a trace.
+    expect(Rails.logger).to have_received(:info).with(/tearing session #{session_id} down.*cmd-0001.*cmd-0002/)
+  end
+
+  # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
+  # deliberately leaves a teardown pending with no reply while the session is between
+  # owners, so there is no answer to wait for.
+  it 'asks for the teardown without waiting for an answer' do
+    backend.delete_session
+
+    expect(client).not_to have_received(:call)
+  end
+
   it 'turns the connect reply into the connection state the inbox stores' do
     state = backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
 
@@ -78,7 +181,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   end
 
   it 'sends a message under an idempotency key built from its reserved id' do
-    expect(client).to receive(:call).with(anything, idempotency_key: 'msg:3EB0AAAA').and_return(results['message.send'])
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0AAAA', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT)
+      .and_return(results['message.send'])
 
     result = backend.send_message(
       model::Commands::MessageSend.new(message_id: '3EB0AAAA', to: model::Address.phone('5541999990000'),
@@ -88,8 +193,43 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(result.message_id).to eq('3EB0AAAA')
   end
 
-  it 'reads the account limits off the session status' do
-    expect(backend.fetch_account_limits).to eq({ 'reachout_time_lock' => { 'status' => 'UNLOCKED' } })
+  # The connector has to fetch the file from this app's storage, encrypt it and upload it
+  # to WhatsApp before it can answer, and the default wait covers only a few megabytes of
+  # that. A file past it failed on the deadline, was retried, and failed at the same
+  # place, which is why the documented cap was never reachable through this client.
+  it 'gives a send carrying a file a wait sized from the length the sender declared' do
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0BBBB', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT + 25)
+      .and_return(results['message.send'])
+
+    backend.send_message(media_send('3EB0BBBB', 25.megabytes))
+  end
+
+  # Every other reason to wait is unchanged, so a small file never shortens the wait a
+  # text would have had.
+  it 'never gives a send less than the default wait' do
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0CCCC', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT + 1)
+      .and_return(results['message.send'])
+
+    backend.send_message(media_send('3EB0CCCC', 1))
+  end
+
+  # A wait this long holds a Redis connection out of the pool and the worker that called
+  # it, so a file too big to move inside the ceiling is one this deployment does not send.
+  it 'bounds the wait however large the file says it is' do
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0DDDD',
+                      timeout: described_class::MEDIA_SEND_MAX_TIMEOUT)
+      .and_return(results['message.send'])
+
+    backend.send_message(media_send('3EB0DDDD', 10.gigabytes))
+  end
+
+  # The contract lets a connection state carry them and this connector fills neither, so
+  # answering the read would hand back an empty slice dressed as an answer.
+  it 'refuses the account limits rather than answering an empty slice' do
+    expect { backend.fetch_account_limits }.to raise_error(Whatsapp::Session::Errors::NotSupported)
   end
 
   it 'downloads media straight from the URL the event carried' do
@@ -154,6 +294,17 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
   end
 
+  def media_send(message_id, size)
+    model::Commands::MessageSend.new(
+      message_id: message_id, to: model::Address.phone('5541999990000'),
+      content: model::Content::Media.new(
+        kind: 'document', mime: 'application/pdf', filename: 'contrato.pdf', size: size,
+        ref: model::MediaRef.url('http://rails:3000/rails/active_storage/blobs/proxy/abc', mime: 'application/pdf',
+                                                                                           size: size)
+      )
+    )
+  end
+
   def download_command(ref)
     model::Commands::MessageDownloadMedia.new(chat: model::Address.phone('5541999990000'), message_id: '3EB0AAAA', ref: ref)
   end
@@ -163,5 +314,73 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
     backend.mark_read(model::Commands::MessageMarkRead.new(chat: model::Address.phone('5541999990000'), message_ids: ['3EB0AAAA']))
     backend.disconnect
+  end
+
+  # --- the ceiling on a published command ------------------------------------------
+  #
+  # Nobody is waiting on a published command, so the deadline the frame carries is the
+  # only limit the connector has for it, and the session's executor is serial: one parked
+  # on a socket write is every send behind it parked too.
+
+  # A momentary state that lands late is not late, it is wrong: an `available` applied
+  # after the agent went offline flips the account back, and a `composing` applied minutes
+  # later is a typing bubble for something nobody is typing.
+  it 'bounds the momentary states by how long they are still true' do
+    backend.send_chat_presence(model::Commands::ChatPresence.new(chat: model::Address.phone('5541999990000'), state: 'composing'))
+    backend.update_presence(model::Commands::PresenceSet.new(state: 'available'))
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::ChatPresence), timeout: described_class::MOMENTARY_TIMEOUT)
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::PresenceSet), timeout: described_class::MOMENTARY_TIMEOUT)
+  end
+
+  # These three are still right whenever they land, so the only reason to bound them is
+  # the executor, and the ceiling has to clear the longest command that can legitimately
+  # be ahead of them on the same queue, which is a send carrying a file.
+  it 'bounds the deferrable commands by what clears a send carrying a file' do
+    backend.mark_read(model::Commands::MessageMarkRead.new(chat: model::Address.phone('5541999990000'), message_ids: ['3EB0AAAA']))
+    backend.mark_unread(model::Commands::MessageMarkUnread.new(chat: model::Address.phone('5541999990000'),
+                                                               last_message_id: '3EB0AAAA', from_me: false))
+    backend.subscribe_presence(model::Commands::PresenceSubscribe.new(party: model::Address.phone('5541999990000')))
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::MessageMarkRead), timeout: described_class::DEFERRABLE_TIMEOUT)
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::MessageMarkUnread), timeout: described_class::DEFERRABLE_TIMEOUT)
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::PresenceSubscribe), timeout: described_class::DEFERRABLE_TIMEOUT)
+    expect(described_class::DEFERRABLE_TIMEOUT).to be > described_class::MEDIA_SEND_MAX_TIMEOUT
+    # And the two budgets have to stay on the right sides of each other: the whole point of
+    # splitting them is that a momentary state expires while a deferrable one is still
+    # waiting its turn behind a send.
+    expect(described_class::MOMENTARY_TIMEOUT).to be < described_class::DEFERRABLE_TIMEOUT
+  end
+
+  # The pairing screen runs on a ceiling of its own, and a code produced after it is a code
+  # for a screen the operator is no longer looking at.
+  it 'bounds the pairing code request by the attempt that asked for it' do
+    backend.request_pairing_code(model::Commands::PairingRequestCode.new(phone: '5541999990000'))
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::PairingRequestCode), timeout: described_class::PAIRING_TIMEOUT)
+  end
+
+  # The teardown takes the ceiling counted from when the work starts, and takes it alone.
+  # A deadline is the half it cannot have: it is published precisely so it can sit pending
+  # while the session is between owners, and a `session.logout` refused for arriving late
+  # leaves a device listed on the customer's phone with nothing here corresponding to it.
+  it 'bounds the teardown by how long it may run, never by when it stops being worth running' do
+    backend.disconnect
+    backend.logout
+    backend.delete_session
+
+    ceiling = { max_runtime: described_class::TEARDOWN_RUNTIME }
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDisconnect), **ceiling)
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout), **ceiling).twice
+    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete), **ceiling)
+    # And never the other one, which is the whole reason both fields exist.
+    expect(client).not_to have_received(:publish).with(anything, hash_including(:timeout))
+    expect(client).not_to have_received(:control).with(anything, hash_including(:timeout))
   end
 end

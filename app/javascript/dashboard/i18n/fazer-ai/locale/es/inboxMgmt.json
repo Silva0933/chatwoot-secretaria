@@ -9,7 +9,7 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Conectar mediante la API no oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
-          "NATIVE_DESC": "Conectar mediante una API no oficial, con el conector que ya viene en esta instalación",
+          "NATIVE_DESC": "Conectar mediante una API no oficial, vinculando como en WhatsApp Web, sin proveedor externo",
           "UAZAPI": "Uazapi",
           "UAZAPI_DESC": "Conectar mediante la API no oficial de Uazapi, en tu propia instancia"
         },
@@ -179,6 +179,23 @@
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - nativo",
       "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
+    },
+    "ACCOUNT_HEALTH": {
+      "WEBHOOK": {
+        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registrado, pero Meta no confirmó apuntar este número en sí aquí. Consulta en la tarjeta de abajo adónde va la entrega ahora.",
+        "RIDES_ON_APP_CALLBACK": "La entrega sigue la URL de callback de la aplicación: ni este número ni su cuenta de WhatsApp Business apuntan a esta instalación, así que deja de llegar si esa URL cambia.",
+        "APP_CALLBACK_POINTS_ELSEWHERE": "Este número no tiene enrutamiento propio, así que la entrega sigue la URL de callback de la aplicación, mostrada abajo, que no es la esperada para este número. Registrar el webhook apunta este número aquí; si Meta lo rechaza en esta cuenta, lo que hay que cambiar es el callback de la aplicación."
+      }
+    },
+    "CONVERSATION_CONTINUITY": {
+      "TITLE": "Continuidad de la conversación",
+      "NOTE_TEXT": "Decide dónde llega un correo nuevo cuando no responde a ningún hilo existente. Una respuesta siempre se queda en el hilo al que responde, sin importar esta configuración.",
+      "TOGGLE_AVAILABILITY": "Continuar el caso abierto del contacto",
+      "TOGGLE_HELP": "Cuando el contacto escribe un correo nuevo mientras una de sus conversaciones sigue abierta, el mensaje entra en esa conversación en lugar de abrir otra. Una vez resuelta la conversación, el siguiente correo abre una nueva. Déjalo desactivado para mantener una conversación por hilo de correo.",
+      "EDIT": {
+        "BUTTON_TEXT": "Actualizar",
+        "SUCCESS_MESSAGE": "Continuidad de la conversación actualizada correctamente"
+      }
     }
   }
 }

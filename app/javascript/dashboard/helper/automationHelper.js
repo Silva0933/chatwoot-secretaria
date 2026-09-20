@@ -3,6 +3,7 @@ import {
   DEFAULT_CONVERSATION_CONDITION,
   DEFAULT_MESSAGE_CREATED_CONDITION,
   DEFAULT_OTHER_CONDITION,
+  MESSAGE_LEVEL_EVENTS,
 } from 'dashboard/constants/automation';
 import {
   OPERATOR_TYPES_1,
@@ -182,6 +183,7 @@ export const getConditionOptions = ({
   type,
   priorityOptions,
   messageTypeOptions,
+  senderTypeOptions,
 }) => {
   if (isCustomAttributeCheckbox(customAttributes, type)) {
     return booleanFilterOptions;
@@ -203,6 +205,8 @@ export const getConditionOptions = ({
     country_code: countries,
     message_type: messageTypeOptions,
     private_note: booleanFilterOptions,
+    sender_id: agents,
+    sender_type: senderTypeOptions,
     priority: priorityOptions,
     group_type: [
       { id: 'individual', name: 'Individual' },
@@ -236,7 +240,7 @@ export const getFileName = (action, files = []) => {
 };
 
 export const getDefaultConditions = eventName => {
-  if (eventName === 'message_created') {
+  if (MESSAGE_LEVEL_EVENTS.includes(eventName)) {
     return structuredClone(DEFAULT_MESSAGE_CREATED_CONDITION);
   }
   if (

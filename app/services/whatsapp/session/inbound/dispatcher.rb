@@ -34,16 +34,24 @@ class Whatsapp::Session::Inbound::Dispatcher
     'group.picture_changed' => 'GroupPictureChanged',
     'group.activity' => 'GroupActivity',
     'history.sync' => 'HistorySync',
-    'account.reachout_timelock' => 'AccountLimits',
-    'account.new_chat_cap' => 'AccountLimits',
+    'call.offer' => 'CallOffer',
     'raw' => 'Raw'
   }.freeze
 
   # Types the catalog defines and this layer deliberately drops. Listed so that a type
   # missing from both tables shows up as a gap instead of as silence.
+  # The offline-sync pair is counts, not content: what the server is about to replay and
+  # that it finished. The messages themselves arrive as ordinary `message.received` and
+  # are stored by the handler that stores every message, so nothing is lost by not
+  # reading these. What they would buy is telling an agent that a backlog is on its way
+  # instead of watching the thread fill on its own, which is #407's to spend.
+  #
+  # `call.terminate` is here because every call ends: a second activity line per call
+  # would say nothing an agent can act on, and on an inbox that auto-rejects it would
+  # always say the same thing. The offer is the one that carries news.
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
-    call.offer call.terminate
+    call.terminate
     session.offline_sync_preview session.offline_sync_completed
   ].freeze
 

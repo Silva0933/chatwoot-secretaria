@@ -56,7 +56,7 @@ class Api::V1::Accounts::PortalsController < Api::V1::Accounts::BaseController
     return render_could_not_create_error(I18n.t('portals.send_instructions.invalid_email_format')) unless valid_email?(email)
     return render_could_not_create_error(I18n.t('portals.send_instructions.custom_domain_not_configured')) if @portal.custom_domain.blank?
 
-    PortalInstructionsMailer.send_cname_instructions(
+    PortalInstructionsMailer.with(account: @portal.account).send_cname_instructions(
       portal: @portal,
       recipient_email: email
     ).deliver_later
@@ -72,7 +72,7 @@ class Api::V1::Accounts::PortalsController < Api::V1::Accounts::BaseController
   private
 
   def fetch_portal
-    @portal = Current.account.portals.find_by(slug: permitted_params[:id])
+    @portal = Current.account.portals.find_by!(slug: permitted_params[:id])
   end
 
   def permitted_params

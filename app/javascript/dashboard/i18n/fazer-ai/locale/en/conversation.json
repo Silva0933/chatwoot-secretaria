@@ -15,7 +15,9 @@
       "GROUPS_DISABLED_RESTRICTED": "Group messages are disabled — enable for free"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Schedule send"
+      "SCHEDULE_SEND": "Schedule send",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "The attachment was discarded because the conversation switched between note and reply.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "The recording was discarded because the conversation switched between note and reply."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversation already assigned",
@@ -25,6 +27,7 @@
     },
     "CHANGE_TEAM_FAILED": "Team change failed",
     "MESSAGE_DELETED_BY_CONTACT": "Deleted by the contact",
+    "MASKED_MESSAGE_WHATSAPP": "WhatsApp does not deliver verification codes to linked devices. This message can only be read on the paired phone.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {
@@ -91,7 +94,8 @@
       "REQUESTED": "Asked the phone for older messages. They appear here as it sends them.",
       "ERROR": "Could not ask for older messages. Try again in a moment.",
       "EXHAUSTED": "There is nothing older here. The rest of this conversation is only on the phone."
-    }
+    },
+    "FILE_IS_EMPTY": "This file is empty and cannot be sent"
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

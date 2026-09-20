@@ -429,6 +429,40 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       end
     end
 
+    # WhatsApp stopped sending message edits as a plaintext protocolMessage and
+    # now encrypts them under the original message's secret. Only the provider
+    # can decrypt one, and it delivers the result as a messages.update; a blob
+    # that still reaches here has no key and rendering it told the agent the
+    # contact had sent an unsupported message.
+    context 'when receiving an encrypted message edit the provider could not decrypt' do
+      it 'ignores it and creates no message' do
+        raw_message = {
+          key: { id: 'msg_secret_edit', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            secretEncryptedMessage: {
+              targetMessageKey: { id: 'msg_original', remoteJid: "#{lid}@lid", fromMe: true },
+              encPayload: 'ZW5jcnlwdGVk',
+              encIv: 'aXY=',
+              secretEncType: 2
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.not_to change(Message, :count)
+      end
+    end
+
     context 'when receiving an album child image message' do
       it 'unwraps the wrapper and processes the message with media' do
         raw_message = {
@@ -1445,6 +1479,52 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         expect(message.content).to eq("Qual horário?\n\n▸ Manhã\n\n▸ Tarde")
         expect(message.content_attributes['rich']).to include('type' => 'poll', 'title' => 'Qual horário?')
       end
+    end
+  end
+
+  describe 'masked message handling' do
+    let(:phone) { '18668392077' }
+
+    after do
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{inbox.id}_*") { |key| Redis::Alfred.delete(key) }
+    end
+
+    # WhatsApp withholds an authentication template (a verification code) from linked
+    # devices and sends a placeholder in its place, so the connector never sees content.
+    it 'flags the message as masked so the bubble can name the reason' do
+      raw_message = {
+        key: { id: 'masked_1', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+        messageTimestamp: timestamp,
+        message: { messageContextInfo: { deviceListMetadataVersion: 2 }, placeholderMessage: { type: 0 } },
+        verifiedBizName: 'OpenAI'
+      }
+      params = { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert',
+                 data: { type: 'notify', messages: [raw_message] } }
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+      end.to change(Message, :count).by(1)
+
+      message = inbox.messages.last
+      expect(message.content).to be_nil
+      expect(message.is_unsupported).to be(true)
+      expect(message.is_masked).to be(true)
+    end
+
+    it 'leaves an unsupported message unflagged, so the two read apart' do
+      raw_message = {
+        key: { id: 'masked_2', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+        messageTimestamp: timestamp,
+        message: { someUnknownMessage: {} }
+      }
+      params = { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert',
+                 data: { type: 'notify', messages: [raw_message] } }
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+      message = inbox.messages.last
+      expect(message.is_unsupported).to be(true)
+      expect(message.is_masked).to be_nil
     end
   end
 

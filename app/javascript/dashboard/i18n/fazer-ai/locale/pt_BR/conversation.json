@@ -15,7 +15,9 @@
       "GROUPS_DISABLED_RESTRICTED": "As mensagens de grupo estão desativadas — ative gratuitamente"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Agendar envio"
+      "SCHEDULE_SEND": "Agendar envio",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "O anexo foi descartado porque a conversa alternou entre nota e resposta.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "A gravação foi descartada porque a conversa alternou entre nota e resposta."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversa já atribuída",
@@ -25,6 +27,7 @@
     },
     "CHANGE_TEAM_FAILED": "Falha ao alterar o time",
     "MESSAGE_DELETED_BY_CONTACT": "Apagada pelo contato",
+    "MASKED_MESSAGE_WHATSAPP": "O WhatsApp não entrega códigos de verificação a dispositivos conectados. Esta mensagem só pode ser lida no celular pareado.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {
@@ -91,7 +94,8 @@
       "REQUESTED": "Pedimos as mensagens mais antigas ao celular. Elas aparecem aqui conforme ele envia.",
       "ERROR": "Não foi possível pedir as mensagens mais antigas. Tente de novo em instantes.",
       "EXHAUSTED": "Não há nada mais antigo aqui. O restante desta conversa está apenas no celular."
-    }
+    },
+    "FILE_IS_EMPTY": "Este arquivo está vazio e não pode ser enviado"
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

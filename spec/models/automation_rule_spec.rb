@@ -225,12 +225,61 @@ RSpec.describe AutomationRule do
       expect(rule.errors[:execution_delay]).to include('cannot be used with attribute_changed conditions.')
     end
 
+    it 'allows a delayed message rule with a label condition' do
+      rule.event_name = 'message_created'
+      rule.execution_delay = 60
+      rule.conditions = [{ 'attribute_key' => 'labels', 'filter_operator' => 'equal_to',
+                           'values' => ['feature'], 'query_operator' => nil }]
+
+      expect(rule).to be_valid
+    end
+
+    it 'rejects a delayed conversation-level rule with a label condition' do
+      rule.event_name = 'conversation_updated'
+      rule.execution_delay = 60
+      rule.conditions = [{ 'attribute_key' => 'labels', 'filter_operator' => 'equal_to',
+                           'values' => ['feature'], 'query_operator' => nil }]
+
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('only supports status and inbox conditions for conversation-level events.')
+    end
+
     it 'rejects a delayed conversation-level rule with a mutable non-status condition' do
       rule.event_name = 'conversation_updated'
       rule.execution_delay = 60
       rule.conditions = [{ 'attribute_key' => 'priority', 'filter_operator' => 'equal_to', 'values' => ['urgent'], 'query_operator' => nil }]
       expect(rule).not_to be_valid
       expect(rule.errors[:execution_delay]).to include('only supports status and inbox conditions for conversation-level events.')
+    end
+
+    # A delayed rule anchors its due time on `waiting_since` or on the message's creation and dedupes its
+    # episode by message id, and an edit has neither: an edit of an hour-old message would be overdue the
+    # moment it armed, and a second edit of the same message could not arm at all. Refused until the
+    # scheduling knows about edits, rather than armed on an anchor that does not describe it (#648).
+    it 'rejects a delayed message_edited rule with a content condition' do
+      rule.event_name = 'message_edited'
+      rule.execution_delay = 60
+      rule.conditions = [{ 'attribute_key' => 'content', 'filter_operator' => 'contains', 'values' => ['orçamento'], 'query_operator' => nil }]
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
+    end
+
+    # The conditions are not what makes it unsupported: the anchor is. An inbox filter would otherwise
+    # walk through the whitelist written for conversation-level events.
+    it 'rejects a delayed message_edited rule whose conditions are all whitelisted' do
+      rule.event_name = 'message_edited'
+      rule.execution_delay = 60
+      rule.conditions = [{ 'attribute_key' => 'inbox_id', 'filter_operator' => 'equal_to', 'values' => [1], 'query_operator' => nil }]
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
+    end
+
+    it 'rejects a delayed message_edited rule with no conditions at all' do
+      rule.event_name = 'message_edited'
+      rule.execution_delay = 60
+      rule.conditions = []
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
     end
 
     it 'allows a delayed conversation-level rule with only status conditions' do

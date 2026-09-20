@@ -494,6 +494,22 @@ RSpec.describe 'Conversations API', type: :request do
         expect(JSON.parse(response.body, symbolize_names: true)[:id]).to eq(conversation.display_id)
       end
     end
+
+    context 'when it is an authenticated bot' do
+      let(:agent_bot) { create(:agent_bot, account: account) }
+      let(:team) { create(:team, account: account) }
+
+      it 'shows a team-assigned conversation' do
+        conversation.update!(team: team)
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
+            headers: { api_access_token: agent_bot.access_token.token },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body.dig('meta', 'team', 'is_member')).to be(false)
+      end
+    end
   end
 
   describe 'PATCH /api/v1/accounts/{account.id}/conversations/:id' do
@@ -752,7 +768,7 @@ RSpec.describe 'Conversations API', type: :request do
       end
 
       it 'does not self assign and clears the agent bot owner if admin changes the conversation status to open' do
-        conversation.update!(status: 'pending', assignee: nil, assignee_agent_bot: agent_bot)
+        conversation.update!(status: 'pending', assignee: nil, ai_assignee: agent_bot)
 
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
              headers: administrator.create_new_auth_token,
@@ -761,7 +777,7 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
         expect(conversation.reload.status).to eq('open')
         expect(conversation.reload.assignee_id).not_to eq(administrator.id)
-        expect(conversation.reload.assignee_agent_bot).to be_nil
+        expect(conversation.reload.ai_assignee).to be_nil
       end
 
       it 'toggles the conversation status to specific status when parameter is passed' do
@@ -892,7 +908,7 @@ RSpec.describe 'Conversations API', type: :request do
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
-      it 'toggles the conversation priority to nil if no value is passed' do
+      it 'updates the conversation priority' do
         expect(conversation.priority).to be_nil
 
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_priority",
@@ -904,10 +920,8 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.priority).to eq('low')
       end
 
-      it 'toggles the conversation priority' do
-        conversation.priority = 'low'
-        conversation.save!
-        expect(conversation.reload.priority).to eq('low')
+      it 'clears the conversation priority when priority is missing' do
+        conversation.update!(priority: 'low')
 
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_priority",
              headers: agent.create_new_auth_token,
@@ -915,6 +929,32 @@ RSpec.describe 'Conversations API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(conversation.reload.priority).to be_nil
+      end
+
+      it 'clears the conversation priority when priority is nil' do
+        conversation.priority = 'low'
+        conversation.save!
+        expect(conversation.reload.priority).to eq('low')
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_priority",
+             headers: agent.create_new_auth_token,
+             params: { priority: nil },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.reload.priority).to be_nil
+      end
+
+      it 'returns unprocessable entity for invalid priority values' do
+        ['none', '', false].each do |invalid_priority|
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_priority",
+               headers: agent.create_new_auth_token,
+               params: { priority: invalid_priority },
+               as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to include('priority')
+        end
       end
     end
 
@@ -1238,6 +1278,218 @@ RSpec.describe 'Conversations API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:id/read_receipt' do
+    let(:inbox) { create(:inbox, account: account) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+    let(:agent_bot) { create(:agent_bot, account: account) }
+
+    before { create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot) }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an agent bot' do
+      let!(:first_message) { create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming) }
+      let!(:last_message) { create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming) }
+
+      before { allow(Rails.configuration.dispatcher).to receive(:dispatch) }
+
+      it 'dispatches messages.read for every unacknowledged incoming message' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation,
+                                                             message_ids: [first_message.id, last_message.id])
+      end
+
+      it 'leaves out the messages the provider has already echoed a receipt for' do
+        first_message.update!(status: :read)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [last_message.id])
+      end
+
+      it 'keeps only the newest of a backlog larger than the cap' do
+        stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 1)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [last_message.id])
+      end
+
+      # The window is over the thread, not over its unread messages. Anchored to the unread ones
+      # instead, the echo that marks this call's batch read hands the next call the batch before
+      # it, and a bot answering every message pages backwards through the whole history.
+      it 'never reaches past the window once the newest messages are acknowledged' do
+        stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 1)
+        last_message.update!(status: :read)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'dispatches messages.read for the message ids it was given' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: [first_message.id] },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [first_message.id])
+      end
+
+      # An empty list is a caller saying it processed nothing, not a caller saying nothing.
+      # Read as the latter it would acknowledge the whole window on its own initiative.
+      it 'sends no receipt when the caller names an empty list' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: [] },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'ignores message ids belonging to another conversation' do
+        other_message = create(:message, account: account, message_type: :incoming)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: [other_message.id] },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'leaves the dashboard read state untouched' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+               headers: { api_access_token: agent_bot.access_token.token },
+               as: :json
+        end.to not_change { conversation.reload.agent_last_seen_at }
+          .and(not_change { conversation.reload.assignee_last_seen_at })
+      end
+
+      # An imported row carries WhatsApp's own timestamp, which has second precision, so a
+      # burst inside one second ties. Ordered by time alone the window is free to land on a
+      # different subset of the tied rows each call, which walks past the cap over time.
+      it 'picks the same window when the timestamps tie' do
+        stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 2)
+        tied = Time.zone.parse('2026-01-01 10:00:00')
+        [first_message, last_message].each { |m| m.update!(created_at: tied) }
+        extra = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming,
+                                 created_at: tied)
+
+        dispatched = []
+        allow(Rails.configuration.dispatcher).to receive(:dispatch) do |event, _time, payload|
+          dispatched << payload[:message_ids] if event == Events::Types::MESSAGES_READ
+        end
+
+        3.times do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+               headers: { api_access_token: agent_bot.access_token.token },
+               as: :json
+        end
+
+        expect(dispatched).to eq(Array.new(3) { [last_message.id, extra.id] })
+      end
+
+      it 'refuses a batch larger than the cap' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: (1..51).to_a },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'denies a bot whose inbox association was switched off' do
+        inactive_bot = create(:agent_bot, account: account)
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: inactive_bot, status: :inactive)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: inactive_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'denies a bot that serves no inbox on the conversation' do
+        other_bot = create(:agent_bot, account: account)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: other_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(response.parsed_body['error']).to eq('You are not authorized to do this action')
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      before do
+        create(:inbox_member, user: agent, inbox: inbox)
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+      end
+
+      it 'dispatches messages.read without touching the last seen timestamps' do
+        message = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end.to(not_change { conversation.reload.agent_last_seen_at })
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [message.id])
+      end
+
+      it 'does not dispatch when the conversation has no incoming message' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
       end
     end
   end

@@ -16,6 +16,13 @@ class Whatsapp::Session::Backends::Uazapi::Client
   UPLOAD_TIMEOUT = 60
   OPEN_TIMEOUT = 5
 
+  # `Net::HTTP` retries an idempotent request once by default, so every ceiling above
+  # buys half of what it reads as: measured here, a GET at `read_timeout: 3` against a
+  # socket that accepts and never answers took 6.0s, and 3.0s with this. The `get`s are
+  # the status reads, one of which runs inside the pairing poll, so the doubling landed
+  # on the loop that is already waiting.
+  MAX_RETRIES = 0
+
   # HTTP status -> contract error code, resolved to a class at raise time by
   # `Errors.build`. Codes rather than classes on purpose: a frozen hash of class objects
   # keeps the ones from before the last reload, and a `rescue` in a caller that did
@@ -100,7 +107,7 @@ class Whatsapp::Session::Backends::Uazapi::Client
   # large body (a group photo travels as base64) would otherwise hold a worker for
   # Net::HTTP's own write default, well past the ceiling this class advertises.
   def filtered(method, path, query, payload, timeout)
-    options = { open_timeout: OPEN_TIMEOUT, read_timeout: timeout, write_timeout: timeout }
+    options = { open_timeout: OPEN_TIMEOUT, read_timeout: timeout, write_timeout: timeout, max_retries: MAX_RETRIES }
     response = SsrfFilter.public_send(method, url(path), headers: headers, body: payload, params: query.presence,
                                                          sensitive_headers: [TOKEN_HEADER], http_options: options)
     [response.code.to_i, response.body]
@@ -120,7 +127,7 @@ class Whatsapp::Session::Backends::Uazapi::Client
   # a misconfiguration or somebody standing in front of it, and both read better as the
   # provider being unreachable.
   def direct(method, path, query, payload, timeout)
-    options = { headers: headers, timeout: timeout, open_timeout: OPEN_TIMEOUT, no_follow: true }
+    options = { headers: headers, timeout: timeout, open_timeout: OPEN_TIMEOUT, no_follow: true, max_retries: MAX_RETRIES }
     options[:query] = query if query.present?
     options[:body] = payload if payload.present?
     response = HTTParty.public_send(method, url(path), **options)
@@ -159,11 +166,20 @@ class Whatsapp::Session::Backends::Uazapi::Client
     STATUS_CODES[status] || (status >= 500 ? 'wa_error' : 'invalid_payload')
   end
 
-  # The provider's own message, when it sends one, and only that field. The rest of an
-  # error body is echoed request data, and on `/send/*` that includes the file we just
-  # uploaded.
+  # The provider's own words, when it sends any, and only that field. The rest of an error
+  # body is echoed request data, and on `/send/*` that includes the file we just uploaded.
+  #
+  # Two keys, because this provider uses two and the one it uses for failures was the one
+  # not being read: `error` carries the refusal ("the number ... is not on WhatsApp",
+  # "Description cannot be empty"), and `message` carries prose that is usually a report
+  # rather than a complaint. Reading only `message` left the operator with the bare status
+  # and no reason, on exactly the answers that had one.
+  ERROR_KEYS = %w[error message].freeze
+
   def detail(body)
-    message = body.is_a?(Hash) ? body['message'] : nil
-    ": #{message}" if message.present?
+    return unless body.is_a?(Hash)
+
+    said = ERROR_KEYS.filter_map { |key| body[key] }.find { |value| value.is_a?(String) && value.present? }
+    ": #{said}" if said
   end
 end

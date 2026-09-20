@@ -9,7 +9,7 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Connect via non-official API Z-API",
           "NATIVE": "WhatsApp (native)",
-          "NATIVE_DESC": "Connect through an unofficial API, using the connector that ships with this installation",
+          "NATIVE_DESC": "Connect through an unofficial API, pairing as with WhatsApp Web, with no outside provider",
           "UAZAPI": "Uazapi",
           "UAZAPI_DESC": "Connect through the unofficial Uazapi API, on your own instance"
         },
@@ -179,6 +179,23 @@
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - native",
       "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
+    },
+    "ACCOUNT_HEALTH": {
+      "WEBHOOK": {
+        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registered, but Meta did not confirm pointing this number itself here. Check the card below for where delivery goes now.",
+        "RIDES_ON_APP_CALLBACK": "Delivery follows the app callback URL: neither this number nor its WhatsApp Business Account is pointed at this installation, so it stops arriving if that URL changes.",
+        "APP_CALLBACK_POINTS_ELSEWHERE": "This number has no routing of its own, so delivery follows the app callback URL shown below, which is not the one expected for this number. Registering the webhook points this number here; if Meta refuses that for this account, the app callback is what has to change."
+      }
+    },
+    "CONVERSATION_CONTINUITY": {
+      "TITLE": "Conversation continuity",
+      "NOTE_TEXT": "Decides where a new email lands when it does not reply to an existing thread. A reply always stays in the thread it answers, whatever this setting says.",
+      "TOGGLE_AVAILABILITY": "Continue the contact's open case",
+      "TOGGLE_HELP": "When a contact writes a fresh email while one of their conversations is still open, the message joins that conversation instead of starting another one. Once the conversation is resolved, the next email opens a new one. Leave this off to keep one conversation per email thread.",
+      "EDIT": {
+        "BUTTON_TEXT": "Update",
+        "SUCCESS_MESSAGE": "Conversation continuity updated successfully"
+      }
     }
   }
 }

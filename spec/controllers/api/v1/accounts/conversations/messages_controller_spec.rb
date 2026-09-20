@@ -98,6 +98,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(conversation.messages.last.attachments.first.file_type).to eq('image')
       end
 
+      # The agent has to learn now, from the request they made, rather than from a failed status
+      # minutes later carrying a provider error nobody can tie back to an empty file.
+      it 'refuses an empty attachment without creating the message' do
+        empty = Tempfile.new(['voice', '.ogg'])
+        empty.close
+        params = { content: nil, attachments: [Rack::Test::UploadedFile.new(empty.path, 'audio/ogg')] }
+
+        post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: params,
+             headers: agent.create_new_auth_token
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('file is empty')
+        expect(conversation.messages.count).to eq(0)
+      end
+
       it 'triggers typing off event for non-private messages' do
         params = { content: 'test-message', private: false }
         allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
@@ -177,7 +193,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
 
       it 'creates a new outgoing input select message' do
         create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
-        select_item1 = build(:bot_message_select)
+        select_item1 = build(:bot_message_select).merge(description: 'First option description')
         select_item2 = build(:bot_message_select)
         params = { content_type: 'input_select', content_attributes: { items: [select_item1, select_item2] } }
 
@@ -190,6 +206,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(conversation.messages.count).to eq(1)
         expect(conversation.messages.first.content_type).to eq(params[:content_type])
         expect(conversation.messages.first.content).to be_nil
+        expect(conversation.messages.first.content_attributes['items'].first['description']).to eq('First option description')
       end
 
       it 'creates a new outgoing cards message' do
@@ -426,6 +443,84 @@ RSpec.describe 'Conversation Messages API', type: :request do
     end
   end
 
+  # Both actions rescue StandardError and hand the exception's own message to the caller, so a
+  # bug in the builder answered with a Ruby diagnostic and a missing record answered with the
+  # SQL predicate that missed. What the caller can act on has to survive; what only describes
+  # our own code must not be echoed.
+  describe 'what an error answers to the caller' do
+    let!(:inbox) { create(:inbox, account: account) }
+    let!(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    before do
+      create(:inbox_member, inbox: conversation.inbox, user: agent)
+      allow(Rails.logger).to receive(:error)
+    end
+
+    def create_message
+      post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+           params: { content: 'test-message' }, headers: agent.create_new_auth_token, as: :json
+    end
+
+    context 'when the failure is a bug in our own code' do
+      before do
+        allow(Messages::MessageBuilder).to receive(:new)
+          .and_raise(NoMethodError, "undefined method 'to_h' for an instance of String")
+      end
+
+      it 'does not put the Ruby diagnostic in the body' do
+        create_message
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).not_to include('undefined method')
+        expect(response.body).not_to include('an instance of')
+      end
+
+      it 'records the real error for whoever has to debug it' do
+        create_message
+
+        expect(Rails.logger).to have_received(:error).with(/NoMethodError/)
+      end
+    end
+
+    # Raised by the builder itself as a plain StandardError, which is indistinguishable from a
+    # bug by class alone. The caller can act on it, so it has to keep arriving.
+    context 'when the failure is something the caller can act on' do
+      before do
+        allow(Messages::MessageBuilder).to receive(:new)
+          .and_raise(StandardError, 'Incoming messages are only allowed in Api inboxes')
+      end
+
+      it 'keeps the message the app chose to raise' do
+        create_message
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('Incoming messages are only allowed in Api inboxes')
+      end
+    end
+
+    context 'when a validation refuses the message' do
+      it 'keeps the validation text, which names what to fix' do
+        post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { content: 'x' * 150_001 }, headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include('too long')
+      end
+    end
+
+    context 'when the message asked for does not exist' do
+      it 'answers without the SQL predicate that missed' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/999999/retry",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response.code.to_i).to be_between(400, 499)
+        expect(response.body).not_to include("Couldn't find Message")
+        expect(response.body).not_to include('[WHERE')
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/retry' do
     let(:message) { create(:message, account: account, message_type: :outgoing, status: :failed, content_attributes: { external_error: 'error' }) }
 
@@ -453,15 +548,73 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(message.reload.content_attributes['external_error']).to be_nil
       end
 
-      it 'clears source_id so the send job does not skip the message' do
-        message.update!(source_id: 'wamid.old_message_id')
+      # The endpoint answering 200 was never the point: what the agent asked for is the message
+      # going out again. Nothing here asserted the job, which is how a claim that could never
+      # succeed shipped and left Retry clearing the failure marker without resending anything.
+      it 'enqueues the send job' do
+        clear_enqueued_jobs
 
         post "/api/v1/accounts/#{account.id}/conversations/#{message.conversation.display_id}/messages/#{message.id}/retry",
              headers: agent.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
-        expect(message.reload.source_id).to be_nil
+        expect(SendReplyJob).to have_been_enqueued.with(message.id)
+      end
+
+      it 'enqueues the send job only once when Retry is clicked twice' do
+        clear_enqueued_jobs
+        2.times do
+          post "/api/v1/accounts/#{account.id}/conversations/#{message.conversation.display_id}/messages/#{message.id}/retry",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end
+
+        expect(SendReplyJob).to have_been_enqueued.with(message.id).once
+      end
+
+      # On a provider channel the source_id is the provider's receipt, and
+      # Base::SendOnChannelService treats a message that has one as already sent by the channel,
+      # so a stale id makes the resend skip. The inbox matters here: this used to run on the
+      # factory default, which is a web widget, where the send is an email notification and the
+      # id belongs to the caller instead.
+      it 'clears source_id on a provider channel so the send job does not skip the message' do
+        whatsapp_inbox = create(:inbox, account: account, channel: create(:channel_whatsapp, account: account,
+                                                                                             validate_provider_config: false, sync_templates: false))
+        create(:inbox_member, inbox: whatsapp_inbox, user: agent)
+        conversation = create(:conversation, account: account, inbox: whatsapp_inbox)
+        failed = create(:message, account: account, conversation: conversation, message_type: :outgoing,
+                                  status: :failed, source_id: 'wamid.old_message_id')
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{failed.id}/retry",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(failed.reload.source_id).to be_nil
+      end
+    end
+
+    # An API inbox's source_id is the caller's own identifier for the message, not a provider
+    # receipt we are free to discard: clearing it would orphan the reference on their side.
+    context 'when the inbox owns its source_id' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      %i[api web_widget].each do |channel|
+        it "keeps source_id on a #{channel} inbox" do
+          inbox = create(:inbox, account: account, channel: create(channel == :api ? :channel_api : :channel_widget, account: account))
+          create(:inbox_member, inbox: inbox, user: agent)
+          conversation = create(:conversation, account: account, inbox: inbox)
+          failed = create(:message, account: account, conversation: conversation, message_type: :outgoing,
+                                    status: :failed, source_id: 'caller-owned-id')
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{failed.id}/retry",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(failed.reload.source_id).to eq('caller-owned-id')
+        end
       end
     end
 
@@ -516,11 +669,16 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
 
       it 'returns not found error' do
+        allow(Rails.logger).to receive(:info)
+
         post "/api/v1/accounts/#{account.id}/conversations/#{message.conversation.display_id}/messages/99999/retry",
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:not_found)
+        expect(response.parsed_body['error']).to eq('Resource could not be found')
+        # the body no longer names the record, so the log is the only place left that does
+        expect(Rails.logger).to have_received(:info).with(/Handled error.*RecordNotFound/)
       end
     end
   end
@@ -584,6 +742,101 @@ RSpec.describe 'Conversation Messages API', type: :request do
           expect(message.reload.status).to eq('failed')
           expect(message.reload.external_error).to eq('err123')
         end
+      end
+    end
+  end
+
+  # The edit an agent types is written before the channel has taken it, and written back when the channel
+  # refuses. Only the edit the channel accepted is an edit anybody made (fazer-ai/chatwoot#648).
+  describe 'PATCH /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/edit_content' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+    let(:inbox) { channel.inbox }
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let!(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let!(:message) do
+      create(:message, conversation: conversation, account: account, inbox: inbox,
+                       message_type: :outgoing, content: 'preço sob consulta', source_id: 'WAMID.1')
+    end
+
+    before do
+      create(:inbox_member, inbox: inbox, user: agent)
+      allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+    end
+
+    def edit(content)
+      patch edit_content_api_v1_account_conversation_message_url(
+        account_id: account.id, conversation_id: conversation.display_id, id: message.id
+      ), params: { content: content }, headers: agent.create_new_auth_token, as: :json
+    end
+
+    it 'announces the edit once the channel has taken it' do
+      allow_any_instance_of(Channel::Whatsapp).to receive(:edit_message).and_return(true) # rubocop:disable RSpec/AnyInstance
+
+      edit('orçamento em 24h')
+
+      expect(response).to have_http_status(:success)
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(Events::Types::MESSAGE_EDITED, anything, anything).once
+    end
+
+    # The body the contact has is still the original one, and the controller has already written the new
+    # one and then written it back. Neither of those two commits is an edit anybody made.
+    it 'announces nothing when the channel refuses the edit' do
+      allow_any_instance_of(Channel::Whatsapp).to receive(:edit_message).and_raise(StandardError, 'channel refused') # rubocop:disable RSpec/AnyInstance
+
+      edit('orçamento em 24h')
+
+      expect(message.reload.content).to eq('preço sob consulta')
+      expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
+        .with(Events::Types::MESSAGE_EDITED, anything, anything)
+    end
+
+    # The write is optimistic, so between it and the channel's answer the row shows a body the contact
+    # may never receive. An evaluation queued by an earlier edit reads the row when it runs, not when it
+    # was announced, and would answer about that body (fazer-ai/chatwoot#660).
+    context 'with rules waiting on an edit of their own' do
+      include ActiveJob::TestHelper
+
+      let!(:on_orcamento) { edit_rule('ED_ORC', 'orçamento') }
+      let!(:on_desconto) { edit_rule('ED_DESCONTO', 'desconto') }
+
+      def edit_rule(name, word)
+        create(:automation_rule, account: account, name: name, event_name: 'message_edited',
+                                 conditions: [{ 'attribute_key' => 'content', 'filter_operator' => 'contains',
+                                                'values' => [word], 'query_operator' => nil }],
+                                 actions: [{ 'action_name' => 'send_message', 'action_params' => [name] }])
+      end
+
+      def ran(automation_rule)
+        account.messages.where("((content_attributes#>>'{}')::jsonb)->>'automation_rule_id' = ?", automation_rule.id.to_s).count
+      end
+
+      # Everything but the avatar fetch, which the agent and the contact queue on creation and which
+      # would go out to gravatar from inside the example.
+      def drain
+        perform_enqueued_jobs(except: Avatar::AvatarFromUrlJob)
+      end
+
+      # The refusal is made to land while the queued work is running, which is the whole window the issue
+      # is about: the first edit's evaluation reaches the row with the second edit's body on it.
+      it 'keeps a queued evaluation off the refused body, and announces the body it put back' do
+        accepted = true
+        allow_any_instance_of(Channel::Whatsapp).to receive(:edit_message) do # rubocop:disable RSpec/AnyInstance
+          next true if accepted
+
+          drain
+          raise StandardError, 'channel refused'
+        end
+
+        edit('orçamento em 24h')
+        accepted = false
+        edit('desconto de 30%')
+        drain
+
+        expect(ran(on_desconto)).to eq(0)
+        expect(ran(on_orcamento)).to eq(1)
+        expect(message.reload.content).to eq('orçamento em 24h')
+        expect(message.reload.is_edited).to be(true)
       end
     end
   end

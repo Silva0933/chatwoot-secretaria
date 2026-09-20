@@ -1,6 +1,19 @@
 class ApplicationMailer < ActionMailer::Base
   include ActionView::Helpers::SanitizeHelper
 
+  # Some mail is the installation's however an account got into Current. A credential reset
+  # belongs to the person and not to one of their workspaces -- and the account it would pick
+  # is whichever `accounts.first` returns, so a user in two workspaces would see one of them
+  # at random on a password email. A compliance notice describes the installation itself.
+  #
+  # Per action, because a mailer can be both: Devise sends the password reset and the workspace
+  # invitation, and the invitation names the account it invites into.
+  class_attribute :installation_branded_actions, default: nil, instance_writer: false
+
+  def self.installation_branded!(*actions)
+    self.installation_branded_actions = actions.presence || :all
+  end
+
   default from: ENV.fetch('MAILER_SENDER_EMAIL', 'Chatwoot <accounts@chatwoot.com>')
   around_action :with_isolated_current
   around_action :switch_locale
@@ -10,11 +23,9 @@ class ApplicationMailer < ActionMailer::Base
   prepend_view_path ::EmailTemplate.resolver
   append_view_path Rails.root.join('app/views/mailers')
   helper :frontend_urls
-  helper do
-    def global_config
-      @global_config ||= GlobalConfig.get('BRAND_NAME', 'BRAND_URL')
-    end
-  end
+  # helper_method rather than a helper block: the block body runs in the view context, which
+  # cannot reach the mailer instance that knows which brand applies.
+  helper_method :global_config
 
   rescue_from(*ExceptionList::SMTP_EXCEPTIONS, with: :handle_smtp_exceptions)
 
@@ -58,13 +69,37 @@ class ApplicationMailer < ActionMailer::Base
   def liquid_locals
     # expose variables you want to be exposed in liquid
     locals = {
-      global_config: GlobalConfig.get('BRAND_NAME', 'BRAND_URL'),
+      global_config: brand.config,
+      # Two roles, because one hex cannot serve both: see BrandColor.
+      brand_color: BrandColor.surface(brand.color),
+      brand_color_text: BrandColor.on_light(brand.color),
+      brand_logo_url: brand.logo_url,
       action_url: @action_url
     }
 
     locals.merge({ attachment_url: @attachment_url }) if @attachment_url
     locals.merge({ failed_contacts: @failed_contacts, imported_contacts: @imported_contacts })
     locals
+  end
+
+  def global_config
+    @global_config ||= brand.config
+  end
+
+  def brand
+    @brand ||= if installation_branded_action?
+                 Brand.for
+               else
+                 Brand.for(account: Current.account, inbox: @conversation&.inbox)
+               end
+  end
+
+  def installation_branded_action?
+    actions = self.class.installation_branded_actions
+    return false if actions.nil?
+    return true if actions == :all
+
+    actions.include?(action_name&.to_sym)
   end
 
   def locale_from_account(account)
