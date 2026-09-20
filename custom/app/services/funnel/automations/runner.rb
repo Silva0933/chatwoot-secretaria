@@ -127,14 +127,18 @@ class Funnel::Automations::Runner
 
     return push_priority_to_conversation(task) if @event_name.to_s.start_with?('funnel.')
 
+    pull_from_conversation(task)
+  end
+
+  private
+
+  def pull_from_conversation(task)
     changed = []
     changed << 'priority' if pull_priority_from_conversation(task)
     changed << 'labels' if pull_labels_from_conversation(task)
 
     changed.empty? ? 'already in sync' : "pulled #{changed.join(' and ')} from conversation"
   end
-
-  private
 
   def push_priority_to_conversation(task)
     return 'priority already matches' if task.priority == @conversation.priority
