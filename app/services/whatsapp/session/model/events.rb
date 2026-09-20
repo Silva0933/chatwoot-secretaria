@@ -41,6 +41,20 @@ module Whatsapp::Session::Model::Events
     wire_type 'session.connect_failure'
   end
 
+  # What the server is about to replay after a session was down, counted before the events
+  # themselves so a reader can say how much is coming instead of watching the queue move.
+  # The messages arrive afterwards as ordinary `message.received`.
+  class SessionOfflineSyncPreview < Data.define(:messages, :receipts, :notifications, :app_data_changes, :total)
+    include Serializable
+    wire_type 'session.offline_sync_preview'
+  end
+
+  # The replay is over: what did not arrive by now is not coming.
+  class SessionOfflineSyncCompleted < Data.define(:count)
+    include Serializable
+    wire_type 'session.offline_sync_completed'
+  end
+
   class PairingQr < Data.define(:png_data_url, :expires_in_ms)
     include Serializable
     wire_type 'pairing.qr'
@@ -71,20 +85,6 @@ module Whatsapp::Session::Model::Events
     wire_type 'pairing.passkey_confirmation'
   end
 
-  # What the session missed while it was down, counted by the server before it replays
-  # any of it, so a reader can say how much is coming instead of watching a queue move.
-  # The messages themselves arrive afterwards as ordinary `message.received`.
-  class SessionOfflineSyncPreview < Data.define(:messages, :receipts, :notifications, :app_data_changes, :total)
-    include Serializable
-    wire_type 'session.offline_sync_preview'
-  end
-
-  # The replay is over: what has not arrived by now is not coming.
-  class SessionOfflineSyncCompleted < Data.define(:count)
-    include Serializable
-    wire_type 'session.offline_sync_completed'
-  end
-
   class MessageReceived < Data.define(:message)
     include Serializable
     wire_type 'message.received'
@@ -106,10 +106,14 @@ module Whatsapp::Session::Model::Events
     defaults from_me: false
   end
 
-  class MessageRevoked < Data.define(:chat, :sender, :message_id, :by, :timestamp)
+  # `message_author` is who the deletion's key claims wrote the message it deletes, which
+  # is not the same as `sender`: WhatsApp addresses a message by (id, participant), and a
+  # group member can send a revoke naming somebody who did not write it. Null where the
+  # key named nobody.
+  class MessageRevoked < Data.define(:chat, :sender, :message_id, :message_author, :by, :timestamp)
     include Serializable
     wire_type 'message.revoked'
-    coerce chat: Address, sender: Party
+    coerce chat: Address, sender: Party, message_author: Party
 
     def by_self?
       by == 'self'
@@ -221,16 +225,6 @@ module Whatsapp::Session::Model::Events
     coerce groups: [Address]
   end
 
-  class AccountReachoutTimelock < Data.define(:reachout_time_lock)
-    include Serializable
-    wire_type 'account.reachout_timelock'
-  end
-
-  class AccountNewChatCap < Data.define(:new_chat_cap)
-    include Serializable
-    wire_type 'account.new_chat_cap'
-  end
-
   class CallOffer < Data.define(:call_id, :from, :video, :timestamp)
     include Serializable
     wire_type 'call.offer'
@@ -268,7 +262,7 @@ module Whatsapp::Session::Model::Events
     PairingQr, PairingCode, PairingSuccess, PairingError, PairingPasskeyRequest,
     PairingPasskeyConfirmation, MessageReceived, MessageReceipt, MessageEdited, MessageRevoked, MessageReaction,
     MediaDownloadFailed, CommandFailed, ChatPresence, PresenceUpdate, ContactPictureChanged, ContactIdentityChanged,
-    GroupJoined, GroupUpdated, GroupPictureChanged, GroupActivity, AccountReachoutTimelock, AccountNewChatCap,
+    GroupJoined, GroupUpdated, GroupPictureChanged, GroupActivity,
     CallOffer, CallTerminate, HistorySync, Raw
   ].freeze
 

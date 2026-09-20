@@ -43,6 +43,42 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
     # the frame and drops it, while the caller is told the command was queued. A logout
     # or a delete discarded that way leaves the session paired, and the conversion or the
     # destruction that asked for it reports success.
+    # The connector reads `deadline` whether or not a reply was asked for: it refuses a
+    # command whose deadline passed before it was reached, and it bounds the execution of
+    # one it does run. A published command has no caller waiting on it to give up, so the
+    # ceiling the frame declares is the only one it gets.
+    it 'bounds a published command by the ceiling its caller declared' do
+      client.publish(model::Commands::ChatPresence.new(chat: model::Address.phone('5541999990000'), state: 'composing'),
+                     timeout: 30)
+
+      frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
+      expect(frame['deadline'].to_i - frame['ts'].to_i).to eq(30_000)
+      # Still fire and forget: the ceiling is for the connector, not for a caller waiting.
+      expect(frame).not_to have_key('reply_to')
+    end
+
+    # The other ceiling, and the teardown is what it exists for: published exactly so it can
+    # sit pending while the session is between owners, it cannot take a deadline without
+    # becoming droppable, and a `session.logout` dropped for arriving late leaves the device
+    # listed on the customer's phone. This one is a duration the connector starts counting
+    # when the work does, so queueing time never eats into it.
+    it 'bounds a published command by how long it may run once it starts' do
+      client.publish(model::Commands::SessionLogout.new, max_runtime: 30)
+
+      frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
+      expect(frame['max_runtime_ms'].to_i).to eq(30_000)
+      # An instant would be the wrong half, and sending both would reintroduce it.
+      expect(frame).not_to have_key('deadline')
+    end
+
+    it 'leaves a published command unbounded when its caller declared no ceiling' do
+      client.publish(model::Commands::SessionLogout.new)
+
+      frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
+      expect(frame).not_to have_key('deadline')
+      expect(frame).not_to have_key('max_runtime_ms')
+    end
+
     it 'refuses to queue for a connector that speaks another protocol' do
       redis.hset("#{prefix}instance:one", 'protocol_min', '2', 'protocol_max', '3')
       redis.sadd("#{prefix}instances", 'one')
@@ -64,7 +100,10 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
 
       frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
       expect(frame['reply_to']).to eq("#{prefix}reply:cmd-0001")
-      expect(frame['deadline'].to_i).to be > frame['ts'].to_i
+      # Shorter than the caller's own wait by the margin, so the connector stops working
+      # on the command before the caller stops caring about the answer.
+      expect(frame['deadline'].to_i - frame['ts'].to_i)
+        .to eq((described_class::RPC_TIMEOUT - described_class::DEADLINE_MARGIN) * 1000)
     end
 
     it 'raises the error the connector reported, mapped to its class' do
@@ -91,6 +130,66 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
 
       expect { client.call(command) }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /speaks protocol 1/)
       expect(redis.exists?("#{prefix}cmd:#{session_id}")).to be(false)
+    end
+  end
+
+  # The control stream carries both kinds: a `session.wake` any instance may take and
+  # nobody waits on, and an `admin.ping` that answers. The margin belongs to the one that
+  # answers, and a wake that carried a deadline could be dropped for arriving late at the
+  # very moment there is no owner to take the session -- which is when it is sent.
+  describe '#control' do
+    it 'leaves a control command that answers nothing unbounded' do
+      client.control(model::Commands::SessionWake.new(desired: 'connected'))
+
+      frame = frame_of(redis.xrange("#{prefix}control").first)
+      expect(frame).not_to have_key('reply_to')
+      expect(frame).not_to have_key('deadline')
+      expect(frame).not_to have_key('max_runtime_ms')
+    end
+
+    # The teardown of a session nobody is running goes through this door, and it needs the
+    # same ceiling as the half that rides the session's own stream: the executor it holds
+    # is the one the connector adopted for the length of the teardown.
+    it 'carries a runtime ceiling on a control command that asks for one' do
+      client.control(model::Commands::SessionDelete.new, max_runtime: 30)
+
+      frame = frame_of(redis.xrange("#{prefix}control").first)
+      expect(frame['max_runtime_ms'].to_i).to eq(30_000)
+      expect(frame).not_to have_key('deadline')
+    end
+
+    # The wake used to be the only caller here, and what refused a connector speaking
+    # another protocol was the `call` that `connect` makes right after it. A teardown has
+    # no call behind it: written to a connector that reads the frame and drops it, the
+    # caller is told it was queued, and the device stays listed on the customer's phone
+    # with the inbox already destroyed.
+    it 'refuses to queue for a connector that speaks another protocol' do
+      redis.hset("#{prefix}instance:one", 'protocol_min', '2', 'protocol_max', '3')
+      redis.sadd("#{prefix}instances", 'one')
+
+      expect { client.control(model::Commands::SessionDelete.new) }
+        .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /speaks protocol 1/)
+      expect(redis.exists?("#{prefix}control")).to be(false)
+    end
+
+    # An empty registry is a different thing, and it is fine for the same reason it is on
+    # publish: the stream holds the frame until a connector comes up and reads it, which
+    # is what a teardown nobody waits on is for.
+    it 'queues a control command with nobody listening yet' do
+      expect { client.control(model::Commands::SessionDelete.new) }.not_to raise_error
+      expect(redis.xrange("#{prefix}control").size).to eq(1)
+    end
+
+    it 'bounds a control command that answers the way it bounds an RPC' do
+      allow(SecureRandom).to receive(:uuid).and_return('cmd-0003')
+      redis.lpush("#{prefix}reply:cmd-0003", { 'v' => 1, 'id' => 'cmd-0003', 'ok' => true, 'result' => {} }.to_json)
+
+      client.control(model::Commands::AdminPing.new)
+
+      frame = frame_of(redis.xrange("#{prefix}control").first)
+      expect(frame['reply_to']).to eq("#{prefix}reply:cmd-0003")
+      expect(frame['deadline'].to_i - frame['ts'].to_i)
+        .to eq((described_class::RPC_TIMEOUT - described_class::DEADLINE_MARGIN) * 1000)
     end
   end
 

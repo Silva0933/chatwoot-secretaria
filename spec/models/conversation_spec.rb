@@ -16,6 +16,7 @@ RSpec.describe Conversation do
     it { is_expected.to belong_to(:contact) }
     it { is_expected.to belong_to(:contact_inbox) }
     it { is_expected.to belong_to(:assignee).optional }
+    it { is_expected.to belong_to(:ai_assignee).optional }
     it { is_expected.to belong_to(:team).optional }
     it { is_expected.to belong_to(:campaign).optional }
   end
@@ -198,7 +199,7 @@ RSpec.describe Conversation do
       conversation = create(:conversation, status: 'open', account: account)
       agent_bot = create(:agent_bot, account: account)
 
-      conversation.update!(assignee_agent_bot: agent_bot)
+      conversation.update!(ai_assignee: agent_bot)
 
       expect(Rails.configuration.dispatcher).to have_received(:dispatch)
         .with(described_class::ASSIGNEE_CHANGED, kind_of(Time), conversation: conversation, notifiable_assignee_change: false,
@@ -460,11 +461,11 @@ RSpec.describe Conversation do
     end
 
     it 'clears agent bot ownership' do
-      conversation.update!(assignee_agent_bot: create(:agent_bot, account: conversation.account))
+      conversation.update!(ai_assignee: create(:agent_bot, account: conversation.account))
 
       conversation.bot_handoff!
 
-      expect(conversation.reload.assignee_agent_bot).to be_nil
+      expect(conversation.reload.ai_assignee).to be_nil
     end
 
     it 'dispatches CONVERSATION_BOT_HANDOFF event' do
@@ -841,7 +842,7 @@ RSpec.describe Conversation do
     end
 
     it 'sets connected agent bot as the conversation owner' do
-      expect(conversation.assignee_agent_bot).to eq(bot_inbox.agent_bot)
+      expect(conversation.ai_assignee).to eq(bot_inbox.agent_bot)
       expect(conversation.assignee).to be_nil
     end
 
@@ -850,7 +851,7 @@ RSpec.describe Conversation do
       conversation = create(:conversation, inbox: bot_inbox.inbox, assignee: agent)
 
       expect(conversation.assignee).to eq(agent)
-      expect(conversation.assignee_agent_bot).to be_nil
+      expect(conversation.ai_assignee).to be_nil
     end
 
     context 'with campaigns' do
@@ -860,14 +861,14 @@ RSpec.describe Conversation do
         campaign = create(:campaign, inbox: bot_inbox.inbox, account: bot_inbox.inbox.account, sender: user)
         conversation = create(:conversation, inbox: bot_inbox.inbox, campaign: campaign)
         expect(conversation.status).to eq('open')
-        expect(conversation.assignee_agent_bot).to be_nil
+        expect(conversation.ai_assignee).to be_nil
       end
 
       it 'returns conversation as pending if campaign has no sender (bot-initiated) and bot is active' do
         campaign = create(:campaign, inbox: bot_inbox.inbox, account: bot_inbox.inbox.account, sender: nil)
         conversation = create(:conversation, inbox: bot_inbox.inbox, campaign: campaign)
         expect(conversation.status).to eq('pending')
-        expect(conversation.assignee_agent_bot).to eq(bot_inbox.agent_bot)
+        expect(conversation.ai_assignee).to eq(bot_inbox.agent_bot)
       end
     end
 
@@ -890,6 +891,26 @@ RSpec.describe Conversation do
     end
   end
 
+  describe '#botinbox: when conversation created inside inbox with only an observer bot' do
+    let!(:observer) { create(:agent_bot_observer) }
+    let(:conversation) { create(:conversation, inbox: observer.inbox) }
+
+    it 'starts open, like an inbox with no bot' do
+      expect(conversation.status).to eq('open')
+    end
+
+    it 'assigns no agent bot' do
+      expect(conversation.ai_assignee).to be_nil
+    end
+
+    it 'reopens as open, not pending, when the contact writes to a resolved conversation' do
+      conversation.update!(status: :resolved)
+      create(:message, message_type: :incoming, account: conversation.account, inbox: conversation.inbox, conversation: conversation)
+
+      expect(conversation.reload.status).to eq('open')
+    end
+  end
+
   describe '#botintegration: when conversation created in inbox with dialogflow integration' do
     let(:inbox) { create(:inbox) }
     let(:hook) { create(:integrations_hook, :dialogflow, inbox: inbox) }
@@ -900,7 +921,7 @@ RSpec.describe Conversation do
     end
 
     it 'does not set agent bot ownership' do
-      expect(conversation.assignee_agent_bot).to be_nil
+      expect(conversation.ai_assignee).to be_nil
     end
   end
 

@@ -12,6 +12,35 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
     expect(channel.reload.provider_connection).to include('connection' => 'connecting', 'epoch' => 3)
   end
 
+  # Every reason the connector puts on a closing `session.state`, taken from
+  # `publishPairingFailure` and the `EventSessionState` emits in
+  # `internal/engine/whatsmeow/session.go`. A key that is missing does not fail anywhere:
+  # it renders as the humanized key, in English, in every locale. `pairing_timeout` did
+  # exactly that while a written sentence for the same failure sat under
+  # `pairing_timed_out`, which nothing sends.
+  %w[
+    connect_failed disconnect_requested disconnected
+    pairing_pair_error pairing_err-scanned-without-multidevice
+    pairing_code_refused pairing_connect_failed
+  ].each do |reason|
+    it "has a sentence written for #{reason}" do
+      writer.apply(state.new(connection: 'close', error: reason, epoch: 3))
+
+      expect(channel.reload.provider_connection['error']).not_to eq(reason.humanize)
+    end
+  end
+
+  # The placeholder still stands, because a blank is worse. What it must not do is stand
+  # in silence: this is the only thing that says a provider started sending something
+  # nobody wrote a sentence for.
+  it 'says out loud when a reason has no sentence' do
+    allow(Rails.logger).to receive(:warn)
+    writer.apply(state.new(connection: 'close', error: 'a_reason_nobody_wrote', epoch: 3))
+
+    expect(Rails.logger).to have_received(:warn).with(/no sentence written.*a_reason_nobody_wrote/)
+    expect(channel.reload.provider_connection['error']).to eq('A reason nobody wrote')
+  end
+
   it 'clears what the new state does not carry' do
     writer.apply(state.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,AAA', epoch: 3))
     writer.apply(state.new(connection: 'open', epoch: 3))
@@ -127,6 +156,61 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
     expect(writer.apply(wrong)).to eq(:unchanged)
 
     expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+  end
+
+  # A quarantined account WhatsApp has since unlinked, by the logout or by its owner removing
+  # the device on the phone, is written as the same quarantine, because a close names no
+  # number. That event is the only thing that tells a logout that landed from a connector
+  # that is not answering, so it has to be kept somewhere the quarantine does not overwrite.
+  describe 'a quarantined account that was unlinked' do
+    let(:wrong) { state.new(connection: 'open', phone_number: '5541988887777', epoch: 1) }
+
+    before do
+      writer.apply(wrong)
+      clear_enqueued_jobs
+    end
+
+    %w[logged_out logged_out_by_request].each do |error|
+      it "is remembered on #{error}, and asks for no further logout" do
+        writer.apply(state.new(connection: 'close', error: error, epoch: 1))
+
+        expect(Whatsapp::Session::LogoutJob).not_to have_been_enqueued
+        expect(described_class.unlinked?(channel)).to be(true)
+        expect(channel.reload.provider_connection['error_code']).to eq('wrong_phone_number')
+      end
+    end
+
+    it 'is not read into a close that says nothing about the account' do
+      writer.apply(state.new(connection: 'close', error: 'disconnected', epoch: 1))
+
+      expect(described_class.unlinked?(channel)).to be(false)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+    end
+
+    # Two writers can hold the same inbox one after the other, and what each does once its
+    # row lock is released runs in no particular order between them. Here a newer wrong
+    # account lands in exactly that gap, after the unlink was accepted.
+    it 'is not put back by an unlink that finished after a newer wrong account' do
+      older = described_class.new(channel)
+      allow(older).to receive(:ensure_logout).and_wrap_original do |original, *args|
+        writer.apply(wrong)
+        original.call(*args)
+      end
+
+      older.apply(state.new(connection: 'close', error: 'logged_out', epoch: 1))
+
+      expect(described_class.unlinked?(channel)).to be(false)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+    end
+
+    it 'is forgotten when a wrong account is reported again' do
+      writer.apply(state.new(connection: 'close', error: 'logged_out', epoch: 1))
+
+      writer.apply(wrong)
+
+      expect(described_class.unlinked?(channel)).to be(false)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+    end
   end
 
   # A history request travels to the phone through the session, so a session that ends

@@ -39,6 +39,7 @@ Rails.application.routes.draw do
   end
 
   get '/health', to: 'health#show'
+  get '/robots.txt', to: 'robots#show', format: false
   get '/api', to: 'api#index'
   namespace :api, defaults: { format: 'json' } do
     namespace :v1 do
@@ -48,6 +49,7 @@ Rails.application.routes.draw do
         member do
           post :update_active_at
           get :cache_keys
+          delete :brand_logo_email
         end
 
         scope module: :accounts do
@@ -182,6 +184,7 @@ Rails.application.routes.draw do
               end
               resources :scheduled_messages, only: [:index, :create, :update, :destroy]
               resources :recurring_scheduled_messages, only: [:index, :create, :update, :destroy]
+              resource :contact_info_request, only: [:create]
               resources :assignments, only: [:create]
               resources :labels, only: [:create, :index]
               resource :participants, only: [:show, :create, :update, :destroy]
@@ -200,6 +203,7 @@ Rails.application.routes.draw do
               post :presence_subscribe
               post :update_last_seen
               post :unread
+              post :read_receipt
               post :custom_attributes
               post :destroy_custom_attributes
               get :attachments
@@ -359,6 +363,7 @@ Rails.application.routes.draw do
             get :agent_bot, on: :member
             get :message_templates, on: :member
             post :set_agent_bot, on: :member
+            resources :agent_bot_observers, only: [:index, :create, :destroy], module: :inboxes
             post :setup_channel_provider, on: :member
             post :request_pairing_code, on: :member
             post :import_whatsapp_session, on: :member
@@ -371,6 +376,7 @@ Rails.application.routes.draw do
             post :register_webhook, on: :member
             post :reset_secret, on: :member
             post :on_whatsapp, on: :member
+            post :rotate_hmac_token, on: :member
             if ChatwootApp.enterprise?
               resource :conference, only: %i[create destroy], controller: 'conference' do
                 get :token, on: :member
@@ -378,6 +384,7 @@ Rails.application.routes.draw do
               post :enable_whatsapp_calling, on: :member
               post :disable_whatsapp_calling, on: :member
               post :set_inbound_calls, on: :member
+              post :set_call_recording, on: :member
             end
 
             resource :csat_template, only: [:show, :create], controller: 'inbox_csat_templates' do
@@ -503,6 +510,11 @@ Rails.application.routes.draw do
           namespace :whatsapp do
             resource :authorization, only: [:create]
             resources :session_providers, only: [:index]
+            resource :access_request, only: [:create] if ChatwootApp.enterprise?
+            post 'manual/preview', to: 'manual_setup#preview'
+            post 'manual/connect', to: 'manual_setup#connect'
+            get 'manual/:inbox_id/webhook_status', to: 'manual_setup#webhook_status'
+            post 'manual/:inbox_id/setup_webhook', to: 'manual_setup#setup_webhook'
           end
 
           resources :webhooks, only: [:index, :create, :update, :destroy]
@@ -690,6 +702,7 @@ Rails.application.routes.draw do
         namespace :v1 do
           resources :accounts do
             member do
+              get :billing_summary
               post :checkout
               post :subscription
               post :select_billing_currency

@@ -1,18 +1,8 @@
 class Whatsapp::HealthService
-  class ApiError < StandardError
-    attr_reader :http_status, :code, :subcode
-
-    def initialize(message:, http_status:, code: nil, subcode: nil)
-      super(message)
-      @http_status = http_status
-      @code = code
-      @subcode = subcode
-    end
-
-    def authorization_error?
-      code.to_i == 190
-    end
-  end
+  # Kept as a name of its own so `rescue Whatsapp::HealthService::ApiError` still means "reading the
+  # health failed" and not "any Graph call failed". What it is, including what counts as an
+  # authorization error, lives in the parent.
+  class ApiError < Whatsapp::ApiError; end
 
   BASE_URI = 'https://graph.facebook.com'.freeze
   MINIMUM_HEALTH_API_VERSION = 24.0
@@ -39,25 +29,33 @@ class Whatsapp::HealthService
   RISKY_QUALITY_RATINGS = %w[YELLOW RED].freeze
   RISKY_STATUSES = %w[BANNED RESTRICTED RATE_LIMITED FLAGGED DISCONNECTED DELETED].freeze
 
-  def initialize(channel)
+  def initialize(channel, deadline: Whatsapp::GraphDeadline::NONE)
     @channel = channel
+    @deadline = deadline
     @access_token = channel.provider_config['api_key']
     # TODO: Remove this health-specific minimum when all WhatsApp integrations are consolidated on the latest Graph API version.
     configured_api_version = GlobalConfigService.load('WHATSAPP_API_VERSION', 'v22.0').delete_prefix('v').to_f
     @api_version = "v#{[configured_api_version, MINIMUM_HEALTH_API_VERSION].max}"
   end
 
-  def fetch_health_status = fetch_health_status_with_error.first
+  def fetch_health_status(include_business_profile: false) = fetch_health_status_with_error(include_business_profile: include_business_profile).first
 
-  def sync_health_status!
+  def sync_health_status!(include_business_profile: false)
     attempted_at = Time.current
     previous_health = @channel.phone_number_health
-    health_status, error = fetch_health_status_with_error
+    health_status, error = fetch_health_status_with_error(include_business_profile: include_business_profile)
     health_status = previous_health.symbolize_keys.slice(*BUSINESS_HEALTH_FIELDS).merge(health_status) if error
 
     log_risky_transition(previous_health, health_status) if persist_health_status(health_status, attempted_at, error)
 
     health_status.merge(health_checked_at: attempted_at)
+  rescue Whatsapp::GraphDeadline::Exceeded
+    # Nothing was asked of Meta: this side's own clock refused the call before it went out,
+    # so there is no answer to record and no attempt to date. Recording it as a check
+    # anyway would move `phone_number_health_checked_at` to now, and the scheduler leaves a
+    # channel alone for six hours after that stamp -- so one refusal buys the number six
+    # hours of nobody looking at it, on a request that was about a webhook (#644).
+    raise
   rescue StandardError => e
     persist_health_error(e, attempted_at)
     raise
@@ -65,12 +63,13 @@ class Whatsapp::HealthService
 
   private
 
-  def fetch_health_status_with_error
+  def fetch_health_status_with_error(include_business_profile:)
     validate_channel!
 
     phone_health = format_phone_health_response(fetch_graph_data(@channel.provider_config['phone_number_id'], phone_health_fields))
     business_health = format_business_account_response(fetch_graph_data(@channel.provider_config['business_account_id'], business_account_fields))
-    [phone_health.merge(business_health), nil]
+    profile_health = { business_profile: Whatsapp::BusinessProfileService.new(@channel, api_version: @api_version).fetch } if include_business_profile
+    [phone_health.merge(business_health, profile_health || {}), nil]
   rescue StandardError => e
     return [phone_health, e] if phone_health
 
@@ -87,6 +86,7 @@ class Whatsapp::HealthService
   def fetch_graph_data(resource_id, fields)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/#{resource_id}",
+      **Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS, **@deadline.cut(Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS),
       query: {
         fields: fields,
         access_token: @access_token
@@ -125,14 +125,7 @@ class Whatsapp::HealthService
   def handle_response(response)
     return response.parsed_response if response.success?
 
-    parsed_response = response.parsed_response
-    error_data = parsed_response.is_a?(Hash) ? parsed_response['error'].to_h : {}
-    error = ApiError.new(
-      message: error_data['message'].presence || 'WhatsApp API request failed',
-      http_status: response.code,
-      code: error_data['code'],
-      subcode: error_data['error_subcode']
-    )
+    error = ApiError.from_response(response)
 
     Rails.logger.error(
       "[WHATSAPP HEALTH] WhatsApp API request failed: http_status=#{error.http_status} " \

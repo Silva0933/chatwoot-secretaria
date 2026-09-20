@@ -1,3 +1,6 @@
+require 'open3'
+require 'tmpdir'
+
 # rubocop:disable Metrics/BlockLength
 namespace :whatsapp do
   namespace :contract do
@@ -6,18 +9,27 @@ namespace :whatsapp do
       puts Whatsapp::SessionContract.checksum
     end
 
-    desc 'Fail when the vendored contract no longer matches CONTRACT_REF (used by CI)'
-    task verify: :environment do
+    # Two different questions, and only the first one used to be asked. Without a ref this
+    # compares the vendored files against the checksum CONTRACT_REF recorded, which catches
+    # a local edit to the copy and nothing else: the connector can add an event, change a
+    # payload, and this side stays silently behind until somebody happens to re-vendor for
+    # an unrelated reason. With a ref it also fetches the connector at that ref and says
+    # what is actually different.
+    desc 'Fail when the vendored contract no longer matches CONTRACT_REF; with a ref, also when it is behind the connector'
+    task :verify, [:ref] => :environment do |_task, args|
       reference = Whatsapp::SessionContract.reference
       actual = Whatsapp::SessionContract.checksum
 
-      if reference['checksum'] == actual
-        puts "contract ok (#{reference['repo']}@#{reference['ref'][0, 12]}, protocol v#{Whatsapp::SessionContract.protocol_version})"
-      else
+      unless reference['checksum'] == actual
         warn "contract drift: CONTRACT_REF says #{reference['checksum']}, files hash to #{actual}"
         warn 'Run `rails whatsapp:contract:sync[<ref>]` to re-vendor, or revert the local edit.'
         exit 1
       end
+
+      puts "contract ok (#{reference['repo']}@#{reference['ref'][0, 12]}, protocol v#{Whatsapp::SessionContract.protocol_version})"
+      next if args[:ref].blank?
+
+      WhatsappContractDrift.against(args[:ref], repo: reference['repo'])
     end
 
     desc 'Re-vendor the contract from a whatsapp-connector checkout (WHATSAPP_CONNECTOR_PATH)'
@@ -25,14 +37,14 @@ namespace :whatsapp do
       source = Pathname.new(ENV.fetch('WHATSAPP_CONNECTOR_PATH', Rails.root.join('../../whatsapp-connector').to_s)).expand_path
       raise "no contract at #{source}/contract" unless source.join('contract').directory?
 
-      ref = args[:ref].presence || `git -C #{source} rev-parse HEAD`.strip
+      ref = WhatsappContractSource.commit_for(source, args[:ref])
       target = Whatsapp::SessionContract.root
       FileUtils.rm_rf(target)
       FileUtils.mkdir_p(target)
       FileUtils.cp_r("#{source}/contract/.", target)
       FileUtils.rm_f(target.join('README.md'))
       Whatsapp::SessionContract.write_reference(repo: 'fazer-ai/whatsapp-connector', ref: ref)
-      puts "vendored #{ref[0, 12]} (checksum #{Whatsapp::SessionContract.checksum})"
+      puts "vendored #{ref[0, 12]} (checksum #{Whatsapp::SessionContract.checksum})#{WhatsappContractSource.local_edits(source)}"
     end
   end
 
@@ -165,11 +177,17 @@ namespace :whatsapp do
 
         channel = WhatsappProviderConversion.channel_for(args[:inbox_id])
         # The capability, not the family: `zapi` pairs with a phone and so is session
-        # family, but it declares no `groups` and its frozen service has no `sync_group`,
-        # so every job this enqueued for one would die on NoMethodError. Reading the
-        # capability also honours the instance-wide groups kill switch for free.
-        unless Whatsapp::Session::Registry.capabilities_for(channel).include?('groups')
-          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which cannot answer for groups"
+        # family, but it declares no group capability and its frozen service has no
+        # `sync_group`, so every job this enqueued for one would die on NoMethodError.
+        # Reading the capability also honours the instance-wide groups kill switch for
+        # free.
+        #
+        # `group_management` and not `groups`: what this enqueues is a roster sync, which
+        # reads the group from the provider. An inbox that takes group conversations and
+        # answers no group commands would pass a `groups` check, enqueue a job per group
+        # contact, have every one of them return without syncing, and report success.
+        unless Whatsapp::Session::Registry.capabilities_for(channel).include?('group_management')
+          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which cannot be asked about groups"
         end
 
         inbox = channel.inbox
@@ -188,6 +206,67 @@ namespace :whatsapp do
         tail = WhatsappProviderConversion.apply? ? ", spread over #{(interval * contacts.size).inspect}" : ''
         puts format('%<count>d group(s)%<tail>s', count: contacts.size, tail: tail)
       end
+    end
+  end
+  namespace :session do
+    # One-time, after upgrading to a connector that carries the resume sweep
+    # (fazer-ai/whatsapp-connector#183).
+    #
+    # That sweep brings back an account nobody is running, and it reads which ones should be up
+    # from `wac_session_desired`, a table written only when the connector executes a
+    # `session.connect` or a `session.disconnect`. The upgrade creates it empty and nothing seeds
+    # it: on the deploy that introduces the fix, every already-paired account has a device row
+    # and no desired row, so the sweep finds no candidate and the fleet stays orphaned exactly as
+    # before (fazer-ai/whatsapp-connector#194).
+    #
+    # The connector cannot seed it without deciding something it has no basis for: a
+    # `session.disconnect` keeps the device, so seeding from the pairing would dial back an
+    # account an operator deliberately stopped, and nothing in its store separates the two
+    # (`bound_at` is when the credential was bound, `wac_session_presence` is chat availability).
+    # This side does know: `provider_connection['connection']` is `open` for the accounts this
+    # installation wants in the air.
+    #
+    # Safe on a healthy fleet: the connector answers a resume for a session that is already up
+    # without dialling anything, and what it does do is write the row this exists to create.
+    desc 'Tell the connector again which native inboxes should be connected (one-time, after the connector upgrade)'
+    task :reassert, %i[batch pause] => :environment do |_task, args|
+      batch = (args[:batch] || 4).to_i
+      pause = (args[:pause] || 10).to_f
+      abort 'batch must be at least 1' if batch < 1
+
+      channels = Channel::Whatsapp.where(provider: 'native').select do |channel|
+        channel.provider_connection['connection'] == 'open'
+      end
+
+      if channels.empty?
+        puts 'no native inbox is recorded as connected; nothing to re-assert.'
+        next
+      end
+
+      puts "re-asserting #{channels.size} native inbox(es), #{batch} at a time, #{pause}s apart"
+      failures = 0
+      channels.each_slice(batch).with_index do |slice, index|
+        # Paced, and the pacing is the point: `wa:control` is one stream for the whole fleet, so
+        # a wake per inbox in the same second is the stampede its retention cannot absorb
+        # (fazer-ai/whatsapp-connector#170). Each account brought back also dials, in a connector
+        # process that has just started.
+        sleep(pause) unless index.zero?
+        slice.each do |channel|
+          # `reassert_desired_state`, not `setup_channel_provider`: the latter writes `connecting`
+          # over the stored state and turns a refusal into `close`, so an inbox this could not
+          # reach would stop matching the selection above and the rerun below would skip exactly
+          # the ones that still need asking.
+          channel.reassert_desired_state
+          puts "  inbox #{channel.inbox&.id}: asked"
+        rescue StandardError => e
+          failures += 1
+          # One inbox that cannot be reached is not a reason to leave the rest down, which is the
+          # whole failure mode this task exists to end.
+          puts "  inbox #{channel.inbox&.id}: #{e.class}: #{e.message}"
+        end
+      end
+
+      puts failures.zero? ? 'done' : "done, #{failures} inbox(es) could not be asked; run again for those"
     end
   end
 end
@@ -291,6 +370,110 @@ module WhatsappProviderConversion
 
       puts "  #{verb}    #{label}#{note ? ": #{note}" : ''}"
       true
+    end
+  end
+end
+
+# Which commit the copy `sync` makes actually comes from.
+#
+# The task used to stamp CONTRACT_REF with the ref it was handed and copy whatever the
+# working tree held, two facts with nothing tying them together: a checkout sitting on a
+# branch from before that ref vendored the old contract under the new ref's name. Nothing
+# caught it, because `verify` with no argument compares the files against the checksum this
+# very task had just written from those same files, so the pair is internally consistent and
+# names a commit it does not correspond to. `verify[<ref>]` would have caught it, and nobody
+# runs it right after a sync that just said it worked.
+module WhatsappContractSource
+  class << self
+    # Refuses rather than checking the ref out: the checkout belongs to whoever is working
+    # in it, and moving somebody else's HEAD to make a copy is not this task's to do. Both
+    # commits go in the message, since "wrong ref" without them is a puzzle.
+    def commit_for(source, ref)
+      head = rev_parse(source, 'HEAD')
+      abort "#{source} is not a git checkout, so there is no commit to name; nothing was vendored" if head.nil?
+      return head if ref.blank?
+
+      asked = rev_parse(source, ref)
+      abort "#{source} does not know #{ref}; fetch it there first, or omit the ref to vendor what is checked out" if asked.nil?
+      return head if asked == head
+
+      abort "#{source} is checked out at #{head[0, 12]}, not #{ref} (#{asked[0, 12]}). " \
+            'Check it out there, or omit the ref to vendor what is checked out.'
+    end
+
+    # Vendoring an uncommitted state is a real thing to want -- a contract change is tried
+    # from both sides before it is a commit -- so this does not refuse. What it must not do
+    # is let the success line claim the copy is that commit, which is the same lie the ref
+    # check above is about, arriving through the working tree instead of through HEAD.
+    def local_edits(source)
+      count = git(source, 'status', '--porcelain', '--', 'contract').to_s.lines.count
+      return '' if count.zero?
+
+      " plus #{count} uncommitted change(s) to contract/"
+    end
+
+    private
+
+    def rev_parse(source, ref)
+      # `^{commit}` so a tag, a branch and a short sha all answer the same thing, and an
+      # existing ref that names something other than a commit answers nothing.
+      git(source, 'rev-parse', '--verify', '--quiet', "#{ref}^{commit}")&.strip.presence
+    end
+
+    # capture2e, so git's own "fatal: not a git repository" does not print past this: a
+    # failure here is answered as nil and spoken for by the abort messages above.
+    def git(source, *)
+      out, status = Open3.capture2e('git', '-C', source.to_s, *)
+      status.success? ? out : nil
+    rescue Errno::ENOENT
+      nil
+    end
+  end
+end
+
+# Comparing the vendored contract against the connector it came from. Kept out of
+# Whatsapp::SessionContract because it is the only part that needs the network: the app
+# reads the vendored copy and nothing else, and a checkout belongs to the task that asked
+# for one.
+module WhatsappContractDrift
+  class << self
+    def against(ref, repo:)
+      Dir.mktmpdir do |dir|
+        fetch(repo, ref, dir)
+        report(Whatsapp::SessionContract.diff(File.join(dir, 'contract')), "#{repo}@#{ref}")
+      end
+    end
+
+    private
+
+    # Fetching the ref rather than cloning a branch, because a branch, a tag and a bare
+    # commit then all work the same way, which is what lets the weekly run ask for `main`
+    # and a person ask for the exact commit a connector release was cut from.
+    def fetch(repo, ref, dir)
+      url = "https://github.com/#{repo}.git"
+      fetched = system('git', 'init', '--quiet', dir) &&
+                system('git', '-C', dir, 'fetch', '--quiet', '--depth', '1', url, ref) &&
+                system('git', '-C', dir, 'checkout', '--quiet', 'FETCH_HEAD')
+      abort "could not fetch #{repo}@#{ref}" unless fetched
+      abort "#{repo}@#{ref} carries no contract/ directory" unless File.directory?(File.join(dir, 'contract'))
+    end
+
+    def report(diff, label)
+      if diff.values.all?(&:empty?)
+        puts "in sync with #{label}"
+        return
+      end
+
+      warn "vendored contract differs from #{label}:"
+      { behind: 'only in the connector', stale: 'differs here', ahead: 'only here' }.each do |key, description|
+        diff[key].each { |path| warn "  #{description}: #{path}" }
+      end
+      # Never automatic. A type the connector added needs a model and a decision about
+      # whether this side handles it or ignores it, and IGNORED is where that decision is
+      # recorded -- re-vendoring on its own would put the file in place and leave the
+      # decision unmade.
+      warn 'Run `rails whatsapp:contract:sync[<ref>]` to re-vendor, then model or ignore whatever it brought.'
+      exit 1
     end
   end
 end

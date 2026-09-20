@@ -9,6 +9,64 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # itself stops well below this; the limit is there so a wrong URL cannot fill a disk.
   MAX_MEDIA_BYTES = 100.megabytes
 
+  # How fast a file is assumed to move, end to end, when sizing the wait for a send that
+  # carries one. Deliberately pessimistic: the connector has to fetch the file from this
+  # app's storage, encrypt it into a temporary file and upload it to WhatsApp before it
+  # can answer, and the number that matters is the slowest of those links rather than the
+  # one inside the datacentre.
+  MEDIA_SEND_RATE = ENV.fetch('WHATSAPP_MEDIA_SEND_RATE_BYTES', 1.megabyte).to_i
+
+  # The ceiling on that wait. A send holds a Redis connection out of the pool and the
+  # worker that called it for as long as it runs, so a file too big to move inside this
+  # is one this deployment does not send -- and it says so on the deadline rather than by
+  # holding a worker indefinitely.
+  MEDIA_SEND_MAX_TIMEOUT = ENV.fetch('WHATSAPP_MEDIA_SEND_MAX_TIMEOUT', 180).to_i
+
+  # --- the ceiling on a published command ------------------------------------------
+  #
+  # A published command carries no `reply_to`, so nobody here is waiting to give up on it
+  # and whatever ceiling the frame declares is the only limit the connector has. The
+  # session's executor takes one command at a time, so a published command with no ceiling
+  # at all, parked on a socket write, is every send behind it parked too.
+  #
+  # The frame offers two, and which one a command wants follows from what a late execution
+  # would cost it. `deadline` is an instant, refusing the command unrun once it passes, so
+  # it is for the commands that are wrong rather than merely late when they land. The
+  # runtime ceiling below is counted from the moment the work starts and can never drop
+  # anything, so it is for the ones that have to happen whenever they arrive.
+  #
+  # The timeouts here are deadlines. The teardown takes the other one, on its own constant.
+
+  # A momentary state that lands late is not late, it is wrong: an `available` applied
+  # after the agent went offline flips the account back, and a `composing` applied minutes
+  # later is a typing bubble for something nobody is typing.
+  MOMENTARY_TIMEOUT = 30
+
+  # These are still right whenever they land, so the only reason to bound them is the
+  # executor, and the ceiling has to clear the longest command that can legitimately be
+  # ahead of them on the same queue: a send carrying a file. A queue holding several of
+  # those back to back can still expire one, and what that costs is a receipt the
+  # customer's phone never shows, repaired the next time the same chat is read.
+  DEFERRABLE_TIMEOUT = MEDIA_SEND_MAX_TIMEOUT + Whatsapp::Connector::Client::RPC_TIMEOUT
+
+  # A pairing code is worth as long as the attempt that asked for it, which is the ceiling
+  # the pairing screen already runs on: past it, the screen the operator would type the
+  # code into is gone.
+  PAIRING_TIMEOUT = Whatsapp::Session::PairingPollJob::DEADLINES.fetch('code').to_i
+
+  # The teardown takes the other ceiling, the one counted from when the work starts, and
+  # takes it alone. A deadline would be the wrong half: a teardown is deliberately left
+  # pending while the session is between owners, and refusing it for arriving late leaves
+  # a device listed on the customer's phone with nothing here corresponding to it. What
+  # the runtime ceiling bounds instead is a teardown parked on a socket write, and it
+  # cannot drop anything, because the clock only starts once the connector picks it up.
+  #
+  # Generous, because the wait it exists to end is a half-open socket rather than a slow
+  # answer: WhatsApp answers an unlink in well under a second, and a socket that is simply
+  # down answers at once with a refusal. Everything the connector still owes itself after
+  # the unlink runs outside this ceiling, by contract.
+  TEARDOWN_RUNTIME = 30
+
   class << self
     def provider_key
       'native'
@@ -53,32 +111,91 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   def disconnect
-    client.publish(commands::SessionDisconnect.new)
+    client.publish(commands::SessionDisconnect.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
   def logout
-    client.publish(commands::SessionLogout.new)
+    client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
+  # The teardown, and the two halves go by different routes because they cover states the
+  # other cannot reach.
+  #
+  # `session.delete` goes on the **control stream**, which every connector instance reads.
+  # A connector reads `wa:cmd:<sid>` only for the sessions it is running, so a teardown
+  # written there for an account nobody has adopted is delivered to nobody at all and dies
+  # when the stream is trimmed -- and that is exactly the state a teardown is most often
+  # sent in: an inbox destroyed while its session was down, or destroyed while the
+  # connector fleet was restarting. On the control stream, whoever reads it adopts the
+  # account for the length of the teardown and tears it down without ever connecting.
+  #
+  # The `session.logout` stays, on the session's own stream, and it is not redundant.
+  # Delivery through the control stream is to *some* instance rather than to the one
+  # running the account: an entry naming a session somebody else owns is left pending and
+  # reclaimed until it reaches that owner, which happens but is not bounded. The logout
+  # rides the owner's own stream, so for a session that is up the device is unlinked at
+  # once, and the delete that follows finds nothing linked, which is a teardown with less
+  # to do rather than a failure. It is also what keeps this working against a connector
+  # build older than fazer-ai/whatsapp-connector#157, whose `session.delete` has no
+  # handler and answers `unsupported`.
+  #
+  # Neither is `call`ed. This runs inside the transaction that destroys the inbox, and an
+  # RPC there would hold it open for the round trip. And a teardown is deliberately left
+  # pending, with no reply at all, while the session is between owners -- being handed
+  # over, or waiting on a lease with room to finish -- so a caller waiting for an answer
+  # would time out exactly when the connector is doing the right thing.
+  #
+  # Logged here, which is the only place it can be. The connector answers a teardown it
+  # could not carry out with `command.failed`, and that event is routed to an inbox by
+  # `session_id`: the inbox this one is about has just been destroyed, so the lookup
+  # misses and the event is dropped as an orphan. What we publish is the last thing about
+  # this session that anybody can see.
+  #
+  # The two ids go into the hash the log line carries. Ruby evaluates the values in the
+  # order they are written, so the logout is still sent first, and a spec pins that
+  # ordering rather than leaving it to be read out of this comment.
   def delete_session
-    client.publish(commands::SessionDelete.new)
+    asked = { logout: client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME),
+              delete: client.control(commands::SessionDelete.new, max_runtime: TEARDOWN_RUNTIME) }
+    Rails.logger.info("[WHATSAPP] tearing session #{session_id} down for inbox #{channel.inbox&.id}: #{asked.to_json}")
   end
 
   def fetch_connection_state
     model::ConnectionState.from_h(client.call(commands::SessionStatus.new))
   end
 
-  # The limits ride along with the session status, which is the only thing that knows
-  # them: they are pushed as events the rest of the time.
-  def fetch_account_limits
-    status = client.call(commands::SessionStatus.new) || {}
-    status.slice('reachout_time_lock', 'new_chat_cap')
+  # The code itself arrives as a pairing.code event: WhatsApp takes its time issuing it,
+  # and the inbox screen is already listening for connection updates.
+  def request_pairing_code(command)
+    client.publish(command, timeout: PAIRING_TIMEOUT)
+    nil
   end
 
   # --- messages ------------------------------------------------------------------
 
   def send_message(command)
-    model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
+    model::SendResult.from_h(
+      client.call(command, idempotency_key: "msg:#{command.message_id}", timeout: send_timeout(command))
+    )
+  end
+
+  # How long to wait for a send, which for a file is not the same question as for a text.
+  #
+  # Every other RPC answers in milliseconds and the default is right for them. A send with
+  # a file has to cover three transfers before the connector can answer, and under the
+  # default only a few megabytes fit: past that the send fails on the deadline, is
+  # retried, and fails at the same place -- which is why the documented cap was never
+  # reachable through this client.
+  #
+  # Sized from the length the sender already declared rather than from that cap, so a
+  # small file is not given the budget meant for the largest one. Never shorter than the
+  # default, because every other reason to wait is unchanged.
+  def send_timeout(command)
+    size = command.content.try(:size).to_i
+    return Whatsapp::Connector::Client::RPC_TIMEOUT if size <= 0
+
+    budget = Whatsapp::Connector::Client::RPC_TIMEOUT + (size.to_f / MEDIA_SEND_RATE).ceil
+    budget.clamp(Whatsapp::Connector::Client::RPC_TIMEOUT, MEDIA_SEND_MAX_TIMEOUT)
   end
 
   def edit_message(command)
@@ -95,11 +212,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   def mark_read(command)
-    client.publish(command)
+    client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
   def mark_unread(command)
-    client.publish(command)
+    client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
   # The connector keeps the bytes on its own disk and serves them over its internal HTTP
@@ -125,15 +242,15 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # --- presence and contacts -----------------------------------------------------
 
   def send_chat_presence(command)
-    client.publish(command)
+    client.publish(command, timeout: MOMENTARY_TIMEOUT)
   end
 
   def update_presence(command)
-    client.publish(command)
+    client.publish(command, timeout: MOMENTARY_TIMEOUT)
   end
 
   def subscribe_presence(command)
-    client.publish(command)
+    client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
   def check_numbers(command)
@@ -164,8 +281,20 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     true
   end
 
+  # WhatsApp refuses participants one at a time -- a privacy setting, the group's
+  # creator, somebody who left recently -- so the answer is a row each and `ok` says only
+  # that the command ran. The connector fails the command when nothing was carried out,
+  # and this reaches the same verdict from the rows: a caller told `ok` and handed a
+  # refusal for every participant it named has had nothing done, which both controllers
+  # already turn into the message an operator reads.
+  #
+  # A partial refusal is not an error. Reporting the participants that were added as not
+  # added is a worse answer, and the caller reads the rows to find out which is which.
   def update_group_participants(command)
-    Array(client.call(command))
+    rows = Array(client.call(command))
+    raise Whatsapp::Session::Errors::GroupParticipantNotAllowed if wholly_refused?(rows)
+
+    rows
   end
 
   def update_group_name(command)
@@ -202,6 +331,13 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   private
+
+  def wholly_refused?(rows)
+    rows.present? && rows.all? do |row|
+      row.is_a?(Hash) &&
+        row.stringify_keys['code'].to_s == Whatsapp::Session::Errors::GroupParticipantNotAllowed::CODE
+    end
+  end
 
   def refresh(command)
     model::MediaRef.from_h(client.call(command))

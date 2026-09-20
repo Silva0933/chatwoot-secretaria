@@ -11,6 +11,7 @@
   "definitions": {
     "protocol_version": { "type": "integer", "const": 1 },
     "timestamp_ms": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "integer", "minimum": 1 },
     "digits": { "type": "string", "pattern": "^[0-9]+$" },
     "message_id": { "type": "string", "minLength": 1, "maxLength": 128 },
 
@@ -117,6 +118,13 @@
         "voice_note": { "type": "boolean" },
         "size": { "type": ["integer", "null"], "minimum": 0 },
         "duration": { "type": ["integer", "null"], "minimum": 0 },
+        "width": { "type": ["integer", "null"], "minimum": 0,
+          "description": "picture width in pixels, for an image, a video or a sticker; both sides or neither" },
+        "height": { "type": ["integer", "null"], "minimum": 0,
+          "description": "picture height in pixels, for an image, a video or a sticker; both sides or neither" },
+        "waveform": { "type": ["array", "null"], "minItems": 64, "maxItems": 64,
+          "items": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "description": "voice note amplitudes, exactly 64 samples of 0-100" },
         "thumbnail": { "type": ["string", "null"], "description": "data: URI, at most 32 KiB" },
         "ref": { "oneOf": [{ "$ref": "#/definitions/media_ref" }, { "type": "null" }] }
       },
@@ -206,7 +214,7 @@
       "type": "object",
       "properties": {
         "type": { "const": "unsupported" },
-        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "protocol", "empty"] }
+        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "masked", "protocol", "empty"] }
       },
       "required": ["type", "reason"],
       "additionalProperties": true
@@ -261,6 +269,7 @@
         "group": { "$ref": "#/definitions/address" },
         "subject": { "type": ["string", "null"] },
         "description": { "type": ["string", "null"] },
+        "topic_id": { "type": ["string", "null"] },
         "owner": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "created_at": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] },
         "participants": { "type": "array", "items": { "$ref": "#/definitions/group_participant" } },
@@ -317,7 +326,7 @@
 
     "command_frame": {
       "type": "object",
-      "description": "One entry of wa:cmd:<sid> or wa:control. reply_to is the wa:reply:<id> list an RPC answer is pushed to.",
+      "description": "One entry of wa:cmd:<sid> or wa:control. reply_to is the wa:reply:<id> list an RPC answer is pushed to. deadline and max_runtime_ms are two different requests: deadline says do not start this after that moment, max_runtime_ms says do not let it run longer than that once started. A command carrying both gets whichever runs out first.",
       "properties": {
         "v": { "$ref": "#/definitions/protocol_version" },
         "id": { "type": "string", "minLength": 1 },
@@ -326,6 +335,7 @@
         "ts": { "$ref": "#/definitions/timestamp_ms" },
         "reply_to": { "type": ["string", "null"] },
         "deadline": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] },
+        "max_runtime_ms": { "oneOf": [{ "$ref": "#/definitions/duration_ms" }, { "type": "null" }] },
         "idempotency_key": { "type": ["string", "null"] },
         "payload": { "type": "object" }
       },
@@ -340,7 +350,7 @@
         "v": { "$ref": "#/definitions/protocol_version" },
         "id": { "type": "string", "minLength": 1 },
         "ok": { "type": "boolean" },
-        "result": { "type": ["object", "null"] },
+        "result": { "type": ["object", "array", "null"] },
         "error": { "oneOf": [{ "$ref": "#/definitions/error" }, { "type": "null" }] }
       },
       "required": ["v", "id", "ok"],
@@ -381,8 +391,6 @@
             { "properties": { "type": { "const": "group.updated" }, "payload": { "$ref": "#/definitions/event_group_updated" } }, "required": ["type"] },
             { "properties": { "type": { "const": "group.picture_changed" }, "payload": { "$ref": "#/definitions/event_group_picture_changed" } }, "required": ["type"] },
             { "properties": { "type": { "const": "group.activity" }, "payload": { "$ref": "#/definitions/event_group_activity" } }, "required": ["type"] },
-            { "properties": { "type": { "const": "account.reachout_timelock" }, "payload": { "$ref": "#/definitions/event_account_reachout_timelock" } }, "required": ["type"] },
-            { "properties": { "type": { "const": "account.new_chat_cap" }, "payload": { "$ref": "#/definitions/event_account_new_chat_cap" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.offer" }, "payload": { "$ref": "#/definitions/event_call_offer" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.terminate" }, "payload": { "$ref": "#/definitions/event_call_terminate" } }, "required": ["type"] },
             { "properties": { "type": { "const": "history.sync" }, "payload": { "type": "object" } }, "required": ["type"] },
@@ -542,6 +550,7 @@
         "chat": { "$ref": "#/definitions/address" },
         "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "message_id": { "$ref": "#/definitions/message_id" },
+        "message_author": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "by": { "enum": ["contact", "self"] },
         "timestamp": { "$ref": "#/definitions/timestamp_ms" }
       },
@@ -671,18 +680,6 @@
         "groups": { "type": "array", "items": { "$ref": "#/definitions/address" }, "minItems": 1 }
       },
       "required": ["groups"],
-      "additionalProperties": true
-    },
-    "event_account_reachout_timelock": {
-      "type": "object",
-      "properties": { "reachout_time_lock": { "type": "object" } },
-      "required": ["reachout_time_lock"],
-      "additionalProperties": true
-    },
-    "event_account_new_chat_cap": {
-      "type": "object",
-      "properties": { "new_chat_cap": { "type": "object" } },
-      "required": ["new_chat_cap"],
       "additionalProperties": true
     },
     "event_call_offer": {
@@ -1012,7 +1009,7 @@
       "type": "object",
       "properties": {
         "group": { "$ref": "#/definitions/address" },
-        "image": { "type": ["string", "null"], "description": "base64 JPEG; null removes the picture" }
+        "image": { "type": ["string", "null"], "description": "base64 JPEG; null or absent removes the picture" }
       },
       "required": ["group"],
       "additionalProperties": true

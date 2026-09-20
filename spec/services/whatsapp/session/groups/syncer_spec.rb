@@ -50,6 +50,42 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     )
   end
 
+  # WhatsApp refuses every edit of such a group's description, so what the panel owes the
+  # operator is the reason rather than a retry. The stored flag is what it reads.
+  context 'when the snapshot says the description can no longer be changed' do
+    let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe de Vendas', topic_id: 'undefined') }
+
+    it 'records that it is frozen' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['description_frozen']).to be(true)
+    end
+  end
+
+  context 'when the snapshot reports an ordinary description id' do
+    let(:stored) { super().merge('description_frozen' => true) }
+    let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe de Vendas', topic_id: '3EB0C7' * 3) }
+
+    it 'records that it is not frozen any more' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['description_frozen']).to be(false)
+    end
+  end
+
+  # uazapi never reports the id, and a sync of a group this account also has on a native
+  # inbox must not read that silence as "this description can be changed". Writing false
+  # here would put the edit back in front of the operator and it would fail forever.
+  context 'when the provider does not report the description id' do
+    let(:stored) { super().merge('description_frozen' => true) }
+
+    it 'leaves the stored answer alone' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['description_frozen']).to be(true)
+    end
+  end
+
   # The settings are optional on the wire. A snapshot that does not report one says
   # nothing about it, and a sync must not read that silence as "off".
   context 'when the snapshot reports no settings at all' do
@@ -90,6 +126,32 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
       fetched_sync
 
       expect(group_contact.reload.group_left_in?(inbox.id)).to be(true)
+    end
+  end
+
+  # `fetch_info` is a network call and `group_contact` was handed in before it, so the copy the
+  # merge reads is already old by the time the write happens. The chat lock around the fetch
+  # serialises this group's own events, not the other writers of the column: an avatar sync, a
+  # dashboard edit, another inbox. Same shape as the Baileys path, one call earlier.
+  context 'when another writer lands during the metadata fetch' do
+    subject(:fetched_sync) { described_class.new(channel: channel, group_contact: group_contact).perform }
+
+    let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+
+    before do
+      allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
+      allow(backend).to receive(:group_info) do
+        Contact.find(group_contact.id).then do |row|
+          row.update!(additional_attributes: row.additional_attributes.merge('custom_note' => 'kept'))
+        end
+        model::GroupInfo.new(group: group, subject: 'Equipe de Vendas')
+      end
+    end
+
+    it 'does not erase what the other writer stored' do
+      fetched_sync
+
+      expect(group_contact.reload.additional_attributes).to include('custom_note' => 'kept')
     end
   end
 
