@@ -72,6 +72,67 @@ RSpec.describe Funnel::Automations::Runner do
     end
   end
 
+  describe 'sync_labels_and_priority' do
+    before { enable('create_task_on_conversation', 'sync_labels_and_priority') }
+
+    def card_labels
+      Funnel::Task.last.reload.labels.map(&:title).sort
+    end
+
+    # Quem etiqueta e quem atende, e ele atende na conversa: e de la que a etiqueta tem de
+    # alcancar o card. Era o que faltava — a regra tinha 'labels' no nome e so mexia em
+    # prioridade.
+    it 'brings the labels of the conversation onto the card' do
+      run('create_task_on_conversation')
+      conversation.update!(label_list: %w[lead-qualificado reuniao-agendada])
+
+      run('sync_labels_and_priority', event_name: 'conversation.updated')
+
+      expect(card_labels).to eq(%w[lead-qualificado reuniao-agendada])
+    end
+
+    # O agente escolhe o nome da etiqueta na hora; ninguem a cadastrou antes.
+    it 'creates the account label the conversation invented' do
+      run('create_task_on_conversation')
+      conversation.update!(label_list: ['etiqueta-nova'])
+
+      expect { run('sync_labels_and_priority', event_name: 'conversation.updated') }
+        .to change { account.labels.where(title: 'etiqueta-nova').count }.from(0).to(1)
+    end
+
+    it 'drops from the card what was taken off the conversation' do
+      run('create_task_on_conversation')
+      conversation.update!(label_list: %w[vip urgente])
+      run('sync_labels_and_priority', event_name: 'conversation.updated')
+
+      conversation.update!(label_list: ['vip'])
+      run('sync_labels_and_priority', event_name: 'conversation.updated')
+
+      expect(card_labels).to eq(['vip'])
+    end
+
+    it 'pulls the priority along with the labels' do
+      run('create_task_on_conversation')
+      conversation.update!(priority: 'high', label_list: ['vip'])
+
+      run('sync_labels_and_priority', event_name: 'conversation.updated')
+
+      expect(Funnel::Task.last.reload.priority).to eq('high')
+    end
+
+    # O caminho de volta so roda quando o card se move, e ali as etiquetas dele nao mudaram: com
+    # o card ainda sem etiqueta, empurrar apagaria as da conversa a cada arrasto.
+    it 'never wipes the labels of the conversation when the card moves' do
+      run('create_task_on_conversation')
+      conversation.update!(label_list: %w[vip urgente])
+      task = Funnel::Task.last
+
+      run('sync_labels_and_priority', event_name: 'funnel.task.moved', task: task)
+
+      expect(conversation.reload.label_list).to contain_exactly('vip', 'urgente')
+    end
+  end
+
   describe 'win_task_on_conversation_resolved' do
     before { enable('create_task_on_conversation', 'win_task_on_conversation_resolved') }
 

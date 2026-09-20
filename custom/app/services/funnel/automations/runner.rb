@@ -125,16 +125,47 @@ class Funnel::Automations::Runner
     task = @task || existing_task
     return 'no task' if task.blank? || @conversation.blank?
 
-    if @event_name.to_s.start_with?('funnel.')
-      @conversation.update!(priority: task.priority) if task.priority != @conversation.priority
-      'priority pushed to conversation'
-    else
-      task.update!(priority: @conversation.priority) if task.priority != @conversation.priority
-      'priority pulled from conversation'
-    end
+    return push_priority_to_conversation(task) if @event_name.to_s.start_with?('funnel.')
+
+    changed = []
+    changed << 'priority' if pull_priority_from_conversation(task)
+    changed << 'labels' if pull_labels_from_conversation(task)
+
+    changed.empty? ? 'already in sync' : "pulled #{changed.join(' and ')} from conversation"
   end
 
   private
+
+  def push_priority_to_conversation(task)
+    return 'priority already matches' if task.priority == @conversation.priority
+
+    @conversation.update!(priority: task.priority)
+    'priority pushed to conversation'
+  end
+
+  def pull_priority_from_conversation(task)
+    return false if task.priority == @conversation.priority
+
+    task.update!(priority: @conversation.priority)
+    true
+  end
+
+  # A etiqueta tem forma diferente dos dois lados: na conversa e texto livre (acts_as_taggable),
+  # no card e registro de Label da conta. A traducao cria a Label que faltar, como o adaptador
+  # /kanban ja faz — o agente etiqueta a conversa com um nome que ele mesmo escolheu, e o card
+  # precisa acompanhar sem que alguem tenha cadastrado a etiqueta antes.
+  #
+  # So no sentido conversa -> card. O inverso rodaria em 'funnel.task.moved', onde as etiquetas
+  # do card nao mudaram: com o card ainda sem etiqueta nenhuma, empurrar apagaria as da conversa
+  # a cada arrasto. Quem etiqueta e quem atende, e ele atende na conversa.
+  def pull_labels_from_conversation(task)
+    titles = Array(@conversation.label_list).map { |title| title.to_s.strip }.reject(&:empty?).uniq
+    return false if titles.sort == task.labels.map(&:title).sort
+
+    ids = titles.map { |title| task.account.labels.find_or_create_by!(title: title).id }
+    replace_association(task, :labels, ids)
+    true
+  end
 
   def closing_step?
     @task.present? && !@task.step.stage_open?
