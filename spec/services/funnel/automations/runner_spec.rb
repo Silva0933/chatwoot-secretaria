@@ -49,6 +49,29 @@ RSpec.describe Funnel::Automations::Runner do
 
       expect { run('create_task_on_conversation') }.not_to change(Funnel::Task, :count)
     end
+
+    it 'skips a whatsapp group' do
+      conversation.contact.update!(identifier: '120363425633427814@g.us')
+
+      expect { run('create_task_on_conversation') }.not_to change(Funnel::Task, :count)
+    end
+
+    it 'records why the group produced no card' do
+      conversation.contact.update!(identifier: '120363425633427814@g.us')
+
+      run('create_task_on_conversation')
+
+      expect(Funnel::AutomationRun.last.data['result']).to eq('group conversation')
+    end
+
+    # O identificador de pessoa no Baileys tambem termina em @lid ou @s.whatsapp.net, e os dois
+    # trazem o @ e um sufixo: casar por "tem arroba" ou pelo telefone ausente tiraria do funil o
+    # lead comum, que e justamente o que o quadro existe para receber.
+    it 'still creates the card for a personal jid' do
+      conversation.contact.update!(identifier: '161447954874419@lid')
+
+      expect { run('create_task_on_conversation') }.to change(Funnel::Task, :count).by(1)
+    end
   end
 
   describe 'auto_assign_task' do
