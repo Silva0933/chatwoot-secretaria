@@ -203,6 +203,30 @@ export const waitingState = (waitingSince, now = Date.now()) => {
 };
 
 /**
+ * Ha quanto tempo o card esta NESTA etapa — o relogio da etapa, nao o do cliente.
+ *
+ * A outra metade de waitingState, e a pergunta que faltava: com o agente tendo respondido por
+ * ultimo o waiting_since e nulo, o relogio do cliente some, e colunas como "Proposta enviada" e
+ * "Reuniao marcada" ficavam sem nenhuma nocao de tempo — um card parado ali ha tres semanas era
+ * indistinguivel de um que chegou hoje.
+ *
+ * Cinza e sem niveis, de proposito. Quanto tempo e demais nesta etapa depende do funil de cada
+ * negocio, e o quadro nao guarda esse prazo em lugar nenhum: pintar de ambar depois de N horas
+ * seria inventar uma meta que ninguem definiu. Prazo que alguem DEFINIU ja tem o seu lugar no
+ * card — o vencimento, que continua sendo o unico que alarma.
+ */
+export const stageAge = (stepChangedAt, now = Date.now()) => {
+  if (!stepChangedAt) return null;
+
+  const since = new Date(stepChangedAt).getTime();
+  if (Number.isNaN(since)) return null;
+
+  const elapsed = Math.max(now - since, 0);
+
+  return { elapsed, label: shortDuration(elapsed) };
+};
+
+/**
  * Urgencia em tres niveis e nao nas quatro prioridades do card.
  *
  * Baixa e media nao ganham marca nenhuma. Sao o estado da maioria — o importador legado marcou

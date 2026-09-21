@@ -6,6 +6,7 @@ import {
   neighboursAt,
   waitingState,
   WAITING_LEVELS,
+  stageAge,
   boardMetrics,
   dueState,
   DUE_STATES,
@@ -115,6 +116,30 @@ describe('funnelHelper', () => {
     it('returns null for a missing or invalid timestamp', () => {
       expect(waitingState(null, now)).toBeNull();
       expect(waitingState('nao e data', now)).toBeNull();
+    });
+  });
+
+  describe('stageAge', () => {
+    const now = new Date('2026-03-10T12:00:00Z').getTime();
+    const ago = ms => new Date(now - ms).toISOString();
+    const MIN = 60 * 1000;
+
+    it('reads the same short scale as the waiting clock', () => {
+      expect(stageAge(ago(55 * MIN), now).label).toBe('55min');
+      expect(stageAge(ago(3 * 60 * MIN), now).label).toBe('3h');
+      expect(stageAge(ago(12 * 24 * 60 * MIN), now).label).toBe('12d');
+    });
+
+    // A pergunta que o relogio do cliente nao responde: com o agente tendo respondido por ultimo
+    // o waiting_since e nulo, e sem isto a coluna inteira ficava sem nocao de tempo.
+    it('answers even when nobody owes a reply', () => {
+      expect(waitingState(null, now)).toBeNull();
+      expect(stageAge(ago(3 * 24 * 60 * MIN), now).label).toBe('3d');
+    });
+
+    it('returns null for a missing or invalid timestamp', () => {
+      expect(stageAge(null, now)).toBeNull();
+      expect(stageAge('nao e data', now)).toBeNull();
     });
   });
 

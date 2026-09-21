@@ -9,6 +9,7 @@ import Icon from 'dashboard/components-next/icon/Icon.vue';
 import FunnelCardMenu from './FunnelCardMenu.vue';
 import {
   waitingState,
+  stageAge,
   dueState,
   formatMoney,
   DUE_STATES,
@@ -140,6 +141,14 @@ const waiting = computed(() => {
   if (!state) return null;
 
   return { ...state, classes: WAITING_CLASSES[state.level] };
+});
+
+// So em etapa aberta. Em Ganho e Perdido o atendimento acabou, e "ha 12 dias nesta etapa" ali
+// mede o tempo desde o fechamento: um numero que cresce para sempre e nao pede acao nenhuma.
+const stage = computed(() => {
+  if (props.task.stepStageType !== 'open') return null;
+
+  return stageAge(props.task.stepChangedAt);
 });
 
 const urgency = computed(() => {
@@ -290,6 +299,18 @@ const openLabel = computed(() =>
       >
         <Icon icon="i-lucide-message-square" class="size-3" />
         {{ conversations.length }}
+      </span>
+
+      <!-- Tempo parado nesta etapa, na mesma familia do canal e do contador: cinza e sem fundo.
+           E contexto para ler a coluna, nao alarme — quem alarma e o vencimento e o relogio do
+           cliente, os dois logo depois deste. -->
+      <span
+        v-if="stage"
+        class="flex items-center gap-1 text-xs shrink-0 text-n-slate-10 tabular-nums"
+        :title="t('FUNNEL.CARD.STAGE_AGE')"
+      >
+        <Icon icon="i-lucide-hourglass" class="size-3" />
+        {{ stage.label }}
       </span>
 
       <span

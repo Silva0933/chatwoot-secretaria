@@ -137,4 +137,54 @@ describe('FunnelCard', () => {
       expect(wrapper.text()).not.toContain('FUNNEL.CARD.TODAY');
     });
   });
+
+  // A pergunta que o relogio do cliente nao responde. Em "Proposta enviada" e "Reuniao marcada" o
+  // agente respondeu por ultimo, o waiting_since e nulo e o relogio some: sem este selo a coluna
+  // inteira ficava sem nenhuma nocao de tempo.
+  describe('time in stage', () => {
+    const hourglass = wrapper =>
+      wrapper.find('[data-icon="i-lucide-hourglass"]');
+
+    it('shows how long the card has been sitting in an open stage', () => {
+      const wrapper = mountCard({
+        stepStageType: 'open',
+        stepChangedAt: at(7, 12),
+        waitingSince: null,
+      });
+
+      expect(hourglass(wrapper).exists()).toBe(true);
+      expect(wrapper.text()).toContain('3d');
+    });
+
+    // Em Ganho e Perdido o atendimento acabou: ali o numero mede o tempo desde o fechamento,
+    // cresce para sempre e nao pede acao nenhuma.
+    it('stays quiet once the card is won or lost', () => {
+      ['won', 'lost'].forEach(stageType => {
+        const wrapper = mountCard({
+          stepStageType: stageType,
+          stepChangedAt: at(7, 12),
+        });
+
+        expect(hourglass(wrapper).exists()).toBe(false);
+      });
+    });
+
+    it('stays quiet without a stage timestamp', () => {
+      const wrapper = mountCard({ stepStageType: 'open', stepChangedAt: null });
+
+      expect(hourglass(wrapper).exists()).toBe(false);
+    });
+
+    // Os dois relogios convivem: um diz que o cliente espera, o outro que o card nao anda.
+    it('sits alongside the waiting clock without replacing it', () => {
+      const wrapper = mountCard({
+        stepStageType: 'open',
+        stepChangedAt: at(7, 12),
+        waitingSince: at(10, 8),
+      });
+
+      expect(hourglass(wrapper).exists()).toBe(true);
+      expect(wrapper.find('[data-icon="i-lucide-clock"]').exists()).toBe(true);
+    });
+  });
 });

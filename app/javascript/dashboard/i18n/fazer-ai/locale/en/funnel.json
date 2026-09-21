@@ -41,6 +41,7 @@
       "CONFIGURE": "Edit card",
       "UNASSIGNED": "Unassigned",
       "WAITING_SINCE": "Customer waiting for a reply for",
+      "STAGE_AGE": "In this stage for",
       "MENU": {
         "LABEL": "Card options",
         "EDIT": "Edit card",
