@@ -17,6 +17,7 @@ class Funnel::TaskConversation < ApplicationRecord
   # fazer.ai Pro faz, e o cliente do agente esta escrito contra esse comportamento. Para essas
   # mudancas ele le o card ao vivo pela API, no preparo do turno.
   after_commit :dispatch_conversation_updated, on: [:create, :destroy]
+  after_commit :archive_orphaned_task, on: :destroy
 
   validates :conversation_id, uniqueness: { scope: :funnel_task_id }
   validate :conversation_belongs_to_task_account
@@ -47,6 +48,33 @@ class Funnel::TaskConversation < ApplicationRecord
     return if conversation.blank? || conversation.destroyed?
 
     conversation.dispatch_conversation_updated_event
+  end
+
+  # Conversa apagada no Chatwoot levava o vinculo junto (dependent: :destroy) e deixava o CARD
+  # para tras: um card sem conversa e sem contato, que o quadro continuava desenhando e ninguem
+  # mais conseguia abrir. Nenhum listener cobria isso — CONVERSATION_DELETED viaja com
+  # `conversation_data`, um hash de contagem, e nao com a conversa, entao o FunnelAutomationListener
+  # nao tem o que extrair. Aqui o vinculo morrendo E o aviso, e chega sempre.
+  #
+  # Arquivar e o nosso excluir e e reversivel; dispatch_updated traduz archived_at em
+  # 'funnel.task.deleted', entao o quadro aberto ve o card sumir sozinho.
+  #
+  # So quando a CONVERSA foi destruida. Desvincular um card a mao passa por este mesmo destroy, e
+  # ali o gesto e "este card nao e desta conversa" e nao "este card acabou" — apagar o card seria
+  # perder trabalho de quem so quis corrigir um vinculo. Apagar um quadro tambem chega aqui, com a
+  # conversa viva, e nao deve arquivar nada alem do que a cascata ja leva.
+  def archive_orphaned_task
+    return unless conversation.nil? || conversation.destroyed?
+
+    # Card com outra conversa ainda vinculada continua sendo um atendimento em curso. Consultado
+    # no banco e nao pela associacao: `task.task_conversations` ja esta cacheada com o vinculo que
+    # acabou de sumir, e leria uma lista que nao existe mais.
+    return if self.class.exists?(funnel_task_id: funnel_task_id)
+
+    task = Funnel::Task.find_by(id: funnel_task_id)
+    return if task.nil? || task.archived?
+
+    task.update!(archived_at: Time.current)
   end
 
   def conversation_belongs_to_task_account

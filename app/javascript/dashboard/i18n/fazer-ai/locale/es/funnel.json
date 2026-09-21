@@ -41,6 +41,7 @@
       "CONFIGURE": "Editar tarjeta",
       "UNASSIGNED": "Sin responsable",
       "WAITING_SINCE": "El cliente espera respuesta desde hace",
+      "STAGE_AGE": "En esta etapa desde hace",
       "MENU": {
         "LABEL": "Opciones de la tarjeta",
         "EDIT": "Editar tarjeta",

@@ -63,6 +63,15 @@ class Funnel::Automations::Runner
   def apply_create_task_on_conversation
     return 'already linked' if existing_task.present?
 
+    # Grupo de WhatsApp nao e lead. Ligar a caixa ao quadro diz "este funil atende este canal", e
+    # o canal traz junto os grupos de que o numero participa — promocao, revenda, condominio. Cada
+    # um virava card em Novo lead e o quadro passava a medir conversa que ninguem vai vender.
+    #
+    # Barrado aqui e nao no listener de proposito: o listener responde "quais quadros", e esta e
+    # uma pergunta sobre a CONVERSA. Fica no registro da automacao, para quem estranhar a ausencia
+    # do card achar a linha que diz por que.
+    return 'group conversation' if @conversation.group_conversation?
+
     task = Funnel::Task.new(
       board: @board,
       step: @board.entry_step,

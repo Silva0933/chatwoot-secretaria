@@ -41,6 +41,7 @@
       "CONFIGURE": "Editar card",
       "UNASSIGNED": "Sem responsável",
       "WAITING_SINCE": "Cliente esperando resposta há",
+      "STAGE_AGE": "Nesta etapa há",
       "MENU": {
         "LABEL": "Opções do card",
         "EDIT": "Editar card",

@@ -131,4 +131,41 @@ RSpec.describe Funnel::TaskConversation do
         .with(Conversation::CONVERSATION_UPDATED, kind_of(Time), anything)
     end
   end
+
+  describe 'archiving the card when the conversation is deleted' do
+    it 'archives a card that lost its only conversation' do
+      described_class.create!(task: task, conversation: conversation)
+
+      conversation.destroy!
+
+      expect(task.reload.archived_at).to be_present
+    end
+
+    # Desvincular a mao passa pelo mesmo destroy. O gesto ali e "este card nao e desta conversa",
+    # e arquivar jogaria fora o trabalho de quem so quis corrigir um vinculo.
+    it 'keeps the card when the link is removed by hand' do
+      link = described_class.create!(task: task, conversation: conversation)
+
+      link.destroy!
+
+      expect(task.reload.archived_at).to be_nil
+    end
+
+    it 'keeps a card that still has another conversation' do
+      other = create(:conversation, account: account)
+      described_class.create!(task: task, conversation: conversation)
+      described_class.create!(task: task, conversation: other)
+
+      conversation.destroy!
+
+      expect(task.reload.archived_at).to be_nil
+    end
+
+    it 'leaves an already archived card alone' do
+      described_class.create!(task: task, conversation: conversation)
+      task.update!(archived_at: 2.days.ago)
+
+      expect { conversation.destroy! }.not_to(change { task.reload.archived_at })
+    end
+  end
 end
