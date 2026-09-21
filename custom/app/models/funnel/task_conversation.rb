@@ -69,7 +69,7 @@ class Funnel::TaskConversation < ApplicationRecord
     # Card com outra conversa ainda vinculada continua sendo um atendimento em curso. Consultado
     # no banco e nao pela associacao: `task.task_conversations` ja esta cacheada com o vinculo que
     # acabou de sumir, e leria uma lista que nao existe mais.
-    return if self.class.where(funnel_task_id: funnel_task_id).exists?
+    return if self.class.exists?(funnel_task_id: funnel_task_id)
 
     task = Funnel::Task.find_by(id: funnel_task_id)
     return if task.nil? || task.archived?
