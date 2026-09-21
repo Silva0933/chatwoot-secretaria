@@ -86,4 +86,62 @@ RSpec.describe FunnelListener do
       step.update!(name: 'Renomeada')
     end
   end
+
+  # O card desenha dados da conversa, e nenhum deles mexe no registro do card: sem estes dois
+  # eventos o quadro aberto so se redesenhava quando alguem arrastava um card.
+  describe 'keeping an open board in sync with the conversation' do
+    let!(:inbox) { create(:inbox, account: account) }
+    let!(:conversation) { create(:conversation, account: account, inbox: inbox) }
+    let!(:task) { create(:funnel_task, board_for_task: board, step: step) }
+
+    before { Funnel::TaskConversation.create!(task: task, conversation: conversation, is_primary: true) }
+
+    it 'redraws the card when the customer writes' do
+      message = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later) do |_tokens, event_name, payload|
+        expect(event_name).to eq('funnel.task.updated')
+        expect(payload[:id]).to eq(task.id)
+      end
+
+      listener.message_created(Events::Base.new('message.created', Time.zone.now, message: message))
+    end
+
+    # A resposta do agente nao muda o trecho, que e a ultima mensagem DO CLIENTE. O que ela muda e
+    # o waiting_since, e isso chega por conversation_updated ja assentado — Message grava o
+    # waiting_since depois de despachar message.created.
+    it 'ignores the agent reply, which changes nothing the card shows' do
+      message = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :outgoing)
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+
+      listener.message_created(Events::Base.new('message.created', Time.zone.now, message: message))
+    end
+
+    it 'redraws the card when the conversation changes' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later) do |_tokens, event_name, payload|
+        expect(event_name).to eq('funnel.task.updated')
+        expect(payload[:id]).to eq(task.id)
+      end
+
+      listener.conversation_updated(Events::Base.new('conversation.updated', Time.zone.now, conversation: conversation))
+    end
+
+    it 'stays quiet for a conversation no card is following' do
+      loose = create(:conversation, account: account, inbox: inbox)
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+
+      listener.conversation_updated(Events::Base.new('conversation.updated', Time.zone.now, conversation: loose))
+    end
+
+    # Card arquivado ja saiu da tela. Reenvia-lo o traria de volta na proxima mensagem.
+    it 'does not resurrect an archived card' do
+      task.update!(archived_at: Time.current)
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+
+      listener.conversation_updated(Events::Base.new('conversation.updated', Time.zone.now, conversation: conversation))
+    end
+  end
 end
